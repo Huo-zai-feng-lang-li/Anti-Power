@@ -39,10 +39,6 @@ const DEFAULT_CONFIG = {
 
 let config = { ...DEFAULT_CONFIG };
 
-// 双击空格检测状态
-let lastSpaceTime = 0;
-const DOUBLE_SPACE_THRESHOLD = 300; // 毫秒
-
 /**
  * 初始化配置
  * @param {Object} userConfig - 用户配置
@@ -453,42 +449,25 @@ async function performEnhance() {
 }
 
 /**
- * 初始化键盘快捷键（双击空格）
+ * 初始化键盘快捷键（Alt+空格）
  */
 function initKeyboardShortcut() {
   document.addEventListener(
     "keydown",
     (e) => {
-      // 只在输入框中生效
-      const target = e.target;
-      const isInput =
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "INPUT" ||
-        target.contentEditable === "true";
+      // Alt+空格 触发增强
+      if (e.key === " " && e.altKey && !e.ctrlKey && !e.metaKey) {
+        // 只在输入框中生效
+        const target = e.target;
+        const isInput =
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "INPUT" ||
+          target.contentEditable === "true";
 
-      if (!isInput) return;
+        if (!isInput) return;
 
-      // 检测空格键
-      if (e.key === " " && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        const now = Date.now();
-
-        if (now - lastSpaceTime < DOUBLE_SPACE_THRESHOLD) {
-          // 双击空格检测成功
-          e.preventDefault();
-
-          // 删除第一个空格（回退一个字符）
-          const input = target;
-          const value = getInputValue(input);
-          if (value.endsWith(" ")) {
-            setInputValue(input, value.slice(0, -1));
-          }
-
-          // 触发增强
-          performEnhance();
-          lastSpaceTime = 0;
-        } else {
-          lastSpaceTime = now;
-        }
+        e.preventDefault();
+        performEnhance();
       }
     },
     true
@@ -503,7 +482,7 @@ function initKeyboardShortcut() {
 export function createEnhanceButton(onClick) {
   const btn = document.createElement("button");
   btn.className = "anti-power-enhance-btn";
-  btn.title = "提示词增强 (双击空格)";
+  btn.title = "提示词增强 (Alt+空格)";
   btn.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>

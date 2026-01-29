@@ -179,7 +179,6 @@ const PROVIDERS: Record<string, ProviderInfo> = {
     keyPlaceholder: "sk-ant-...",
     modelHint: "Claude 4.5 系列",
     models: [
-      { label: "Claude Opus 4.5 (思考)", value: "claude-opus-4-5-20250514" },
       { label: "Claude Sonnet 4.5 (推荐)", value: "claude-sonnet-4-5-20250514" },
       { label: "Claude Haiku 4.5 (快速)", value: "claude-haiku-4-5-20250514" },
     ],
