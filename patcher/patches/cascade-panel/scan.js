@@ -402,8 +402,8 @@ const initPromptEnhanceButton = async () => {
         const enhanced = await enhanceModule.enhance(text);
         console.log("[PromptEnhance] 增强完成，准备填入输入框");
 
-        // 使用更可靠的方式设置输入框的值
-        const success = await setInputValueReliably(currentInput, enhanced);
+        // 使用 enhance.js 中导出的可靠赋值方法
+        const success = await enhanceModule.setInputValue(currentInput, enhanced);
 
         if (success) {
           console.log("[PromptEnhance] 输入框填入成功");
@@ -428,145 +428,6 @@ const initPromptEnhanceButton = async () => {
         btn.classList.remove("loading");
       }
     });
-
-    /**
-     * 可靠地设置输入框的值（处理 React 受控组件）
-     * 尝试多种方法，包括剪贴板粘贴
-     */
-    async function setInputValueReliably(input, value) {
-      console.log(
-        "[PromptEnhance] 开始设置输入框值, 元素类型:",
-        input.tagName,
-        "是否contentEditable:",
-        input.contentEditable,
-      );
-
-      // 先聚焦输入框
-      input.focus();
-      await sleep(50);
-
-      // 方法1: 对于 contenteditable，使用 execCommand
-      if (input.contentEditable === "true") {
-        console.log("[PromptEnhance] 方法1: contenteditable + execCommand");
-        // 选中全部 → 插入新内容
-        document.execCommand("selectAll", false, null);
-        await sleep(10);
-        const success = document.execCommand("insertText", false, value);
-
-        if (success && input.textContent === value) {
-          console.log("[PromptEnhance] execCommand 成功");
-          return true;
-        }
-
-        // 备选: 直接设置 innerHTML
-        console.log("[PromptEnhance] execCommand 失败，尝试直接设置 innerHTML");
-        input.innerHTML = value.replace(/\n/g, "<br>");
-        input.dispatchEvent(
-          new InputEvent("input", { bubbles: true, inputType: "insertText" }),
-        );
-        return true;
-      }
-
-      // 方法2: 对于 textarea/input，尝试 execCommand（某些 Electron 框架支持）
-      console.log("[PromptEnhance] 方法2: textarea/input + execCommand");
-      input.focus();
-      input.select(); // 选中所有文本
-      await sleep(10);
-
-      const execSuccess = document.execCommand("insertText", false, value);
-      await sleep(50);
-
-      if (execSuccess && input.value === value) {
-        console.log("[PromptEnhance] execCommand 成功");
-        return true;
-      }
-
-      // 方法3: 使用原生 setter
-      console.log("[PromptEnhance] 方法3: 原生 setter + React 事件");
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        input.tagName === "TEXTAREA"
-          ? window.HTMLTextAreaElement.prototype
-          : window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-
-      if (nativeSetter) {
-        nativeSetter.call(input, value);
-      } else {
-        input.value = value;
-      }
-
-      // 触发多种事件
-      input.dispatchEvent(
-        new InputEvent("input", {
-          bubbles: true,
-          cancelable: true,
-          inputType: "insertText",
-          data: value,
-        }),
-      );
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-      input.dispatchEvent(new Event("change", { bubbles: true }));
-
-      await sleep(100);
-      if (input.value === value) {
-        console.log("[PromptEnhance] 原生 setter 成功");
-        return true;
-      }
-
-      // 方法4: 使用剪贴板粘贴（终极方案）
-      console.log("[PromptEnhance] 方法4: 剪贴板粘贴");
-      try {
-        // 保存当前剪贴板内容
-        const originalClipboard = await navigator.clipboard
-          .readText()
-          .catch(() => "");
-
-        // 写入新内容到剪贴板
-        await navigator.clipboard.writeText(value);
-
-        // 聚焦并选中所有
-        input.focus();
-        input.select();
-        await sleep(10);
-
-        // 模拟粘贴事件
-        const pasteEvent = new ClipboardEvent("paste", {
-          bubbles: true,
-          cancelable: true,
-          clipboardData: new DataTransfer(),
-        });
-        pasteEvent.clipboardData.setData("text/plain", value);
-        input.dispatchEvent(pasteEvent);
-
-        // 或者使用 execCommand paste
-        document.execCommand("paste");
-
-        await sleep(100);
-
-        // 恢复原剪贴板
-        if (originalClipboard) {
-          await navigator.clipboard.writeText(originalClipboard);
-        }
-
-        if (input.value === value) {
-          console.log("[PromptEnhance] 剪贴板粘贴成功");
-          return true;
-        }
-      } catch (e) {
-        console.warn("[PromptEnhance] 剪贴板方法失败:", e);
-      }
-
-      console.warn(
-        "[PromptEnhance] 所有方法都失败了，输入框值:",
-        input.value?.substring(0, 50),
-      );
-      return false;
-    }
-
-    function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
 
     function copyToClipboard(text) {
       navigator.clipboard

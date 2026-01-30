@@ -4,7 +4,7 @@
  * 支持 OpenAI 兼容格式和 Anthropic Claude 格式
  *
  * 功能特性:
- * - 双击空格快捷键触发增强
+ * - 输入框旁显性按钮触发
  * - 直接替换输入框内容（无弹窗）
  * - 自动收集 IDE 上下文信息
  * - 简洁的 toast 提示
@@ -126,12 +126,14 @@ const CONVERSATION_SELECTORS = [
 const MESSAGE_SELECTORS = [
   // 用户消息
   {
-    selector: '[data-message-author-role="user"], [class*="user-message"], [class*="human-message"]',
+    selector:
+      '[data-message-author-role="user"], [class*="user-message"], [class*="human-message"]',
     role: "user",
   },
   // AI 消息
   {
-    selector: '[data-message-author-role="assistant"], [class*="assistant-message"], [class*="ai-message"], [class*="bot-message"]',
+    selector:
+      '[data-message-author-role="assistant"], [class*="assistant-message"], [class*="ai-message"], [class*="bot-message"]',
     role: "assistant",
   },
 ];
@@ -156,9 +158,9 @@ const MESSAGE_CONTENT_SELECTORS = [
 function collectConversationContext() {
   const result = {
     conversationHistory: [], // 对话历史 [{role, content}]
-    currentFile: null,       // 当前打开的文件
-    selectedCode: null,      // 选中的代码
-    attachedFiles: [],       // @ 引用的文件
+    currentFile: null, // 当前打开的文件
+    selectedCode: null, // 选中的代码
+    attachedFiles: [], // @ 引用的文件
   };
 
   try {
@@ -200,11 +202,11 @@ function extractConversationHistory() {
 
   // 策略 1: 查找对话容器，然后提取所有消息
   const conversationContainer = findConversationContainer();
-  
+
   if (conversationContainer) {
     // 尝试按消息块提取
     const messageBlocks = findMessageBlocks(conversationContainer);
-    
+
     if (messageBlocks.length > 0) {
       messageBlocks.forEach((block) => {
         const message = extractMessageFromBlock(block);
@@ -237,7 +239,7 @@ function findConversationContainer() {
       if (container && container.children.length > 0) {
         // 验证这确实是对话容器（包含消息元素）
         const hasMessages = container.querySelector(
-          '[class*="message"], [data-message-author-role], [class*="prose"]'
+          '[class*="message"], [data-message-author-role], [class*="prose"]',
         );
         if (hasMessages) {
           return container;
@@ -260,7 +262,7 @@ function findMessageBlocks(container) {
 
   // 尝试多种选择器找到消息块
   const selectors = [
-    '[data-message-author-role]',
+    "[data-message-author-role]",
     '[class*="message-row"]',
     '[class*="message-block"]',
     '[class*="chat-message"]',
@@ -306,7 +308,8 @@ function extractMessageFromBlock(block) {
   // 尝试从属性获取
   const authorRole = block.getAttribute("data-message-author-role");
   if (authorRole) {
-    role = authorRole === "assistant" || authorRole === "ai" ? "assistant" : "user";
+    role =
+      authorRole === "assistant" || authorRole === "ai" ? "assistant" : "user";
   } else {
     // 通过 class 名称推断
     const className = block.className || "";
@@ -326,7 +329,7 @@ function extractMessageFromBlock(block) {
     } else {
       // 通过图标或头像推断
       const hasAIIcon = block.querySelector(
-        '[class*="ai-icon"], [class*="bot-icon"], [class*="assistant-avatar"], svg[class*="sparkle"]'
+        '[class*="ai-icon"], [class*="bot-icon"], [class*="assistant-avatar"], svg[class*="sparkle"]',
       );
       if (hasAIIcon) {
         role = "assistant";
@@ -370,13 +373,15 @@ function extractMessageFromBlock(block) {
 function cleanMessageContent(content) {
   if (!content) return "";
 
-  return content
-    // 去除复制按钮文本
-    .replace(/\b(Copy|复制|Copied!|已复制)\b/gi, "")
-    // 去除多余空行
-    .replace(/\n{3,}/g, "\n\n")
-    // 去除行首行尾空白
-    .trim();
+  return (
+    content
+      // 去除复制按钮文本
+      .replace(/\b(Copy|复制|Copied!|已复制)\b/gi, "")
+      // 去除多余空行
+      .replace(/\n{3,}/g, "\n\n")
+      // 去除行首行尾空白
+      .trim()
+  );
 }
 
 /**
@@ -472,7 +477,7 @@ function extractAtMentions() {
 
   try {
     const inputArea = document.querySelector(
-      'textarea, [contenteditable="true"]'
+      'textarea, [contenteditable="true"]',
     );
     if (inputArea) {
       const text = inputArea.value || inputArea.textContent || "";
@@ -581,21 +586,23 @@ function formatContextForPrompt(context) {
 
   // 4. 对话历史 - 这是最核心的部分
   // 使用新的 conversationHistory 字段（如果存在）
-  const conversationHistory = context.conversationHistory || context.recentMessages || [];
-  
+  const conversationHistory =
+    context.conversationHistory || context.recentMessages || [];
+
   if (conversationHistory.length > 0) {
     parts.push("\n=== 当前对话上下文 ===");
-    
+
     // 遍历对话历史，格式化每条消息
     conversationHistory.forEach((msg, idx) => {
       const roleLabel = msg.role === "assistant" ? "AI 回复" : "用户提问";
       // 每条消息最多保留 1500 字符
-      const content = msg.content.length > 1500 
-        ? msg.content.substring(0, 1500) + "..." 
-        : msg.content;
+      const content =
+        msg.content.length > 1500
+          ? msg.content.substring(0, 1500) + "..."
+          : msg.content;
       parts.push(`\n[${roleLabel} ${idx + 1}]:\n${content}`);
     });
-    
+
     parts.push("\n=== 对话上下文结束 ===");
   }
 
@@ -773,66 +780,150 @@ function getInputValue(input) {
  * @param {HTMLElement} input
  * @param {string} value
  */
-function setInputValue(input, value) {
-  const isContentEditable = input.contentEditable === "true";
+/**
+ * 辅助函数：延迟
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (isContentEditable) {
-    // 对于 contenteditable 元素，使用 innerText 保留换行
-    // 或者将换行符转换为 <br> 标签
-    input.innerText = value;
-    
-    // 触发输入事件
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new InputEvent("input", { 
-      bubbles: true, 
+/**
+ * 可靠地设置输入框的值（保留换行和格式，处理 React 受控组件）
+ * @param {HTMLElement} input
+ * @param {string} value
+ * @returns {Promise<boolean>} 是否设置成功
+ */
+export async function setInputValue(input, value) {
+  console.log(
+    "[PromptEnhance] 开始设置输入框值, 元素类型:",
+    input.tagName,
+    "是否contentEditable:",
+    input.contentEditable,
+  );
+
+  // 先聚焦输入框
+  input.focus();
+  await sleep(50);
+
+  // 方法1: 对于 contenteditable，使用 execCommand
+  if (input.contentEditable === "true") {
+    console.log("[PromptEnhance] 方法1: contenteditable + execCommand");
+    // 选中全部 → 插入新内容
+    document.execCommand("selectAll", false, null);
+    await sleep(10);
+    const success = document.execCommand("insertText", false, value);
+
+    if (success && input.textContent === value) {
+      console.log("[PromptEnhance] execCommand 成功");
+      return true;
+    }
+
+    // 备选: 直接设置 innerHTML
+    console.log("[PromptEnhance] execCommand 失败，尝试直接设置 innerHTML");
+    input.innerHTML = value.replace(/\n/g, "<br>");
+    input.dispatchEvent(
+      new InputEvent("input", { bubbles: true, inputType: "insertText" }),
+    );
+    return true;
+  }
+
+  // 方法2: 对于 textarea/input，尝试 execCommand（某些 Electron 框架支持）
+  console.log("[PromptEnhance] 方法2: textarea/input + execCommand");
+  input.focus();
+  input.select(); // 选中所有文本
+  await sleep(10);
+
+  const execSuccess = document.execCommand("insertText", false, value);
+  await sleep(50);
+
+  if (execSuccess && input.value === value) {
+    console.log("[PromptEnhance] execCommand 成功");
+    return true;
+  }
+
+  // 方法3: 使用原生 setter
+  console.log("[PromptEnhance] 方法3: 原生 setter + React 事件");
+  const nativeSetter = Object.getOwnPropertyDescriptor(
+    input.tagName === "TEXTAREA"
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype,
+    "value",
+  )?.set;
+
+  if (nativeSetter) {
+    nativeSetter.call(input, value);
+  } else {
+    input.value = value;
+  }
+
+  // 触发多种事件
+  input.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
       cancelable: true,
       inputType: "insertText",
-      data: value 
-    }));
-  } else if (input.tagName === "TEXTAREA") {
-    // 对于 textarea，使用原生 setter 绕过 React 受控组件
-    // textarea 原生支持换行符 \n
-    const nativeSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLTextAreaElement.prototype,
-      "value",
-    )?.set;
+      data: value,
+    }),
+  );
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
 
-    if (nativeSetter) {
-      nativeSetter.call(input, value);
-    } else {
-      input.value = value;
-    }
-    
-    // 触发 React 的事件
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    
-    // 自动调整高度以适应内容（如果支持）
-    if (input.style) {
-      input.style.height = "auto";
-      input.style.height = input.scrollHeight + "px";
-    }
-  } else {
-    // 对于 input 元素（不支持多行，但仍设置值）
-    const nativeSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
-
-    if (nativeSetter) {
-      nativeSetter.call(input, value);
-    } else {
-      input.value = value;
-    }
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+  await sleep(100);
+  if (input.value === value) {
+    console.log("[PromptEnhance] 原生 setter 成功");
+    return true;
   }
 
-  // 聚焦并将光标移到末尾
-  input.focus();
-  if (input.setSelectionRange) {
-    input.setSelectionRange(value.length, value.length);
+  // 方法4: 使用剪贴板粘贴（终极方案）
+  console.log("[PromptEnhance] 方法4: 剪贴板粘贴");
+  try {
+    // 保存当前剪贴板内容
+    const originalClipboard = await navigator.clipboard
+      .readText()
+      .catch(() => "");
+
+    // 写入新内容到剪贴板
+    await navigator.clipboard.writeText(value);
+
+    // 聚焦并选中所有
+    input.focus();
+    input.select();
+    await sleep(10);
+
+    // 模拟粘贴事件
+    const pasteEvent = new ClipboardEvent("paste", {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: new DataTransfer(),
+    });
+    pasteEvent.clipboardData.setData("text/plain", value);
+    input.dispatchEvent(pasteEvent);
+
+    // 或者使用 execCommand paste
+    document.execCommand("paste");
+
+    await sleep(100);
+
+    // 恢复原剪贴板
+    if (originalClipboard) {
+      await navigator.clipboard.writeText(originalClipboard);
+    }
+
+    if (input.value === value) {
+      console.log("[PromptEnhance] 剪贴板粘贴成功");
+      return true;
+    }
+  } catch (e) {
+    console.warn("[PromptEnhance] 剪贴板方法失败:", e);
   }
+
+  console.warn(
+    "[PromptEnhance] 所有方法都失败了，输入框值:",
+    input.value?.substring(0, 50),
+  );
+  return false;
 }
 
 // ============================================

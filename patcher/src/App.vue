@@ -10,8 +10,10 @@ import PromptEnhanceCard from "./components/PromptEnhanceCard.vue";
 import AboutModal from "./components/AboutModal.vue";
 import ConfirmModal from "./components/ConfirmModal.vue";
 
+import { getVersion } from "@tauri-apps/api/app";
+
 // 常量
-const APP_VERSION = "2.3.0";
+const APP_VERSION = ref("");
 const GITHUB_URL = "https://github.com/daoif/Antigravity-Power-Pro";
 
 // 补丁文件清单
@@ -222,7 +224,8 @@ async function updateConfigOnly() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  APP_VERSION.value = await getVersion();
   detectPath();
 });
 </script>
