@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/daoif/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/版本-v2.3.8-blue.svg" alt="版本">
+    <img src="https://img.shields.io/badge/版本-v2.3.9-blue.svg" alt="版本">
   </a>
   <a href="https://codeium.com/antigravity">
     <img src="https://img.shields.io/badge/支持_Antigravity-v1.14.2-green.svg" alt="Antigravity">
@@ -108,7 +108,7 @@ sudo ./Antigravity-Power-Pro.sh
 
 | 补丁版本 | 支持的 Antigravity 版本 | 发布日期   | 更新内容                                                           |
 | -------- | ----------------------- | ---------- | ------------------------------------------------------------------ |
-| v2.3.8   | v1.15.8                 | 2026-01-30 | 修复提示词增强功能在受控组件下的输入问题，移除无效的快捷键描述 |
+| v2.3.9   | v1.15.8                 | 2026-01-30 | 修复提示词增强功能在受控组件下的输入问题，实现前端自动读取版本号   |
 | v2.3.7   | v1.15.8                 | 2026-01-29 | 新增提示词增强功能, 支持自定义 API/模型                            |
 | v2.2.0   | v1.14.2                 | 2026-01-21 | Manager Mermaid/数学公式渲染, 对话宽度/字号调节, 感谢 @mikessslxxx |
 | v2.1.0   | v1.14.2                 | 2026-01-19 | 侧边栏字体调节, Mermaid 报错提示优化, Manager 一键复制             |
