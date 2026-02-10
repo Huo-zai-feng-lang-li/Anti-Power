@@ -166,7 +166,14 @@ async function checkWindsurfPatchStatus(path: string) {
     if (isWindsurfInstalled.value) {
       const config = await invoke<any>("read_windsurf_patch_config", { path });
       if (config) {
-        windsurfFeatures.value = { ...windsurfFeatures.value, ...config };
+        const merged = { ...windsurfFeatures.value, ...config };
+        if (config.promptEnhance) {
+          merged.promptEnhance = { ...windsurfFeatures.value.promptEnhance, ...config.promptEnhance };
+          if (!merged.promptEnhance.systemPrompt) {
+            merged.promptEnhance.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+          }
+        }
+        windsurfFeatures.value = merged;
       }
     }
   } catch (e) {
@@ -270,7 +277,14 @@ async function checkPatchStatus(path: string) {
         fontSize?: number;
       } | null>("read_patch_config", { path });
       if (config) {
-        features.value = { ...features.value, ...config };
+        const merged = { ...features.value, ...config };
+        if ((config as any).promptEnhance) {
+          merged.promptEnhance = { ...features.value.promptEnhance, ...(config as any).promptEnhance };
+          if (!merged.promptEnhance.systemPrompt) {
+            merged.promptEnhance.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+          }
+        }
+        features.value = merged;
       }
 
       // 读取 Manager 配置

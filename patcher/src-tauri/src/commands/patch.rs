@@ -572,6 +572,18 @@ pub fn uninstall_windsurf_patch(path: String) -> Result<(), String> {
     }
 
     restore_windsurf_files(&workbench_dir)?;
+
+    // 恢复 product.json 备份
+    let product_json = windsurf_path
+        .join("resources").join("app").join("product.json");
+    let product_backup = product_json.with_extension("json.bak");
+    if product_backup.exists() {
+        fs::copy(&product_backup, &product_json)
+            .map_err(|e| format!("恢复 product.json 失败: {}", e))?;
+        fs::remove_file(&product_backup)
+            .map_err(|e| format!("删除 product.json 备份失败: {}", e))?;
+    }
+
     Ok(())
 }
 
@@ -733,11 +745,12 @@ fn clear_product_checksums(product_json_path: &PathBuf) -> Result<(), String> {
             .map_err(|e| format!("备份 product.json 失败: {}", e))?;
     }
 
-    // 读取并解析 JSON
+    // 读取并解析 JSON (跳过 UTF-8 BOM)
     let content = fs::read_to_string(product_json_path)
         .map_err(|e| format!("读取 product.json 失败: {}", e))?;
+    let content = content.trim_start_matches('\u{feff}');
     
-    let mut json: serde_json::Value = serde_json::from_str(&content)
+    let mut json: serde_json::Value = serde_json::from_str(content)
         .map_err(|e| format!("解析 product.json 失败: {}", e))?;
 
     // 清空 checksums 字段
