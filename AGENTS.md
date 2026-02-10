@@ -4,8 +4,10 @@
 
 ## 项目定位
 
-- Antigravity-Power-Pro 是 Antigravity AI IDE 的增强补丁.
-- 主要增强侧边栏对话区域 (cascade-panel): Mermaid 渲染, 数学公式渲染, 一键复制, 表格颜色修复, 字体大小控制等.
+- Antigravity-Power-Pro 是 Antigravity AI IDE 和 Windsurf IDE 的增强补丁.
+- Antigravity: 侧边栏 (cascade-panel) Mermaid/公式渲染, 一键复制, 表格修复, 字体调节, 提示词增强.
+- Windsurf: Cascade 面板字体调节, 提示词增强, 滚动到底部按钮.
+- 前端使用 Tab 切换布局 (Antigravity / Windsurf).
 - 当前重点支持 Windows, macOS 仅手动安装流程 (见 `README.md` / `patcher/patches/manual-install.md`).
 
 ## 补丁落地流程 (核心链路)
@@ -28,11 +30,19 @@
 - `patcher/patches/manual-install.md`: 随补丁压缩包提供的手动安装说明 (Windows/macOS).
 - `patcher/patches/workbench-jetski-agent.html` + `patcher/patches/manager-panel/`: Manager 窗口补丁入口与模块.
 
-## Antigravity 内部 Hook 点
+## IDE 内部 Hook 点
 
+### Antigravity
 - 侧边栏: `resources/app/extensions/antigravity/cascade-panel.html`
 - Manager 窗口: `resources/app/out/vs/code/electron-browser/workbench/workbench-jetski-agent.html`
 - 注意: 修改 `workbench-jetski-agent.html` 会触发 "扩展已损坏" 提示, 但不影响使用.
+
+### Windsurf
+- 主窗口: `resources/app/out/vs/code/electron-browser/workbench/workbench.html`
+- 补丁目录: 同级 `windsurf-panel/` (JS/CSS/config.json/enhance.js)
+- 修改 `workbench.html` 会触发 "安装似乎损坏" 提示, 通过清除 `product.json` checksums 解决.
+- CSP 启用了 `require-trusted-types-for 'script'`, 补丁通过注册 `default` Trusted Types 策略解决.
+- Cascade 面板 DOM: `#windsurf.cascadePanel`, 滚动区 `.cascade-scrollbar`, 输入框 `[contenteditable][role="textbox"]`.
 
 ## 运行逻辑速览 (侧边栏补丁)
 
@@ -50,7 +60,7 @@
 ## 重要约束/风险
 
 - 嵌入清单由 build.rs 自动生成, 新增/删除补丁文件时确认 `.embed-exclude.txt` 是否需要更新 (如 `config.json`, 文档).
-- 安装逻辑使用白名单: 侧边栏仅 `cascade-panel.html` + `cascade-panel/`, Manager 仅 `workbench-jetski-agent.html` + `manager-panel/`.
+- 安装逻辑使用白名单: 侧边栏仅 `cascade-panel.html` + `cascade-panel/`, Manager 仅 `workbench-jetski-agent.html` + `manager-panel/`, Windsurf 仅 `workbench-windsurf.html` -> `workbench.html` + `windsurf-panel/`.
 - Antigravity 官方更新会覆盖补丁, 需要重新安装.
 - 已知问题: 表格内含 `|` 的 LaTeX 公式渲染异常 (见 `docs/reference/known-issues.md`).
 
@@ -60,3 +70,5 @@
 - `apply_patch` 在中文内容较长时可能触发 `byte index ... is not a char boundary`, 导致补丁失败.
   - 解决: 使用提权 PowerShell `Set-Content -Encoding UTF8` 直接写入, 或先写 ASCII 再分段追加.
 - 写入 `patcher/patches/` 或清理 `tests/` 在沙箱下可能 `Access denied`, 需要使用提权命令执行写入/删除.
+- PowerShell `ConvertTo-Json | Set-Content` 会写入 UTF-8 BOM, 导致 serde_json 解析失败. Rust 代码已添加 `trim_start_matches('\u{feff}')` 处理.
+- Windsurf 卸载时需恢复 `product.json.bak`, 否则仍会显示 "安装损坏".
