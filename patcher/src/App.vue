@@ -112,6 +112,7 @@ const isWindsurfInstalled = ref(false);
 const showWindsurfConfirm = ref(false);
 
 const windsurfFeatures = ref({
+  scrollToBottom: true,
   promptEnhance: {
     enabled: false,
     provider: "anthropic",
@@ -469,6 +470,14 @@ onMounted(async () => {
           @detect="detectWindsurfPath"
           @browse="browseWindsurfPath"
         />
+
+        <section v-if="windsurfPath" class="card">
+          <h3 class="card-title">Windsurf 功能配置</h3>
+          <label class="toggle-row">
+            <span>滚动到底部按钮</span>
+            <input type="checkbox" v-model="windsurfFeatures.scrollToBottom" />
+          </label>
+        </section>
 
         <PromptEnhanceCard
           v-if="windsurfPath"

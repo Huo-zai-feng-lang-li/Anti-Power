@@ -24,6 +24,7 @@ if (window.trustedTypes && !window.trustedTypes.defaultPolicy) {
 const SCRIPT_BASE = new URL("./", import.meta.url).href;
 
 const DEFAULT_CONFIG = {
+  scrollToBottom: true,
   promptEnhance: {
     enabled: false,
     provider: "anthropic",
@@ -266,7 +267,7 @@ const initScrollToBottom = async (panel) => {
 
   const panel = await waitForCascadePanel();
 
-  if (panel) {
+  if (panel && config.scrollToBottom !== false) {
     initScrollToBottom(panel);
   }
 

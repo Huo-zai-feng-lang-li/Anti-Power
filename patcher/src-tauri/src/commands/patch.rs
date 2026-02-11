@@ -519,6 +519,8 @@ fn restore_backup_files(extensions_dir: &PathBuf, workbench_dir: &PathBuf) -> Re
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WindsurfFeatureConfig {
+    #[serde(rename = "scrollToBottom")]
+    pub scroll_to_bottom: bool,
     #[serde(rename = "promptEnhance")]
     pub prompt_enhance: PromptEnhanceConfig,
 }
@@ -526,6 +528,7 @@ pub struct WindsurfFeatureConfig {
 impl Default for WindsurfFeatureConfig {
     fn default() -> Self {
         Self {
+            scroll_to_bottom: true,
             prompt_enhance: PromptEnhanceConfig::default(),
         }
     }
@@ -685,6 +688,7 @@ fn write_windsurf_patches(workbench_dir: &PathBuf, features: &WindsurfFeatureCon
 /// 写入 Windsurf 配置文件
 fn write_windsurf_config_file(config_path: &PathBuf, features: &WindsurfFeatureConfig) -> Result<(), String> {
     let config_content = serde_json::json!({
+        "scrollToBottom": features.scroll_to_bottom,
         "promptEnhance": {
             "enabled": features.prompt_enhance.enabled,
             "provider": features.prompt_enhance.provider,
