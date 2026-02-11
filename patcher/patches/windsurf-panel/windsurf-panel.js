@@ -173,21 +173,8 @@ const initPromptEnhance = async (config) => {
 const SCROLL_BTN_ID = "windsurf-scroll-bottom-btn";
 const SCROLL_THRESHOLD = 120;
 
-const initScrollToBottom = async (panel) => {
+const initScrollToBottom = (panel) => {
   const findScrollEl = () => panel.querySelector(".cascade-scrollbar");
-
-  let scrollEl = findScrollEl();
-  if (!scrollEl) {
-    scrollEl = await new Promise((resolve) => {
-      const obs = new MutationObserver(() => {
-        const el = findScrollEl();
-        if (el) { obs.disconnect(); resolve(el); }
-      });
-      obs.observe(panel, { childList: true, subtree: true });
-      setTimeout(() => { obs.disconnect(); resolve(null); }, 15000);
-    });
-  }
-  if (!scrollEl) return;
 
   let trackedEl = null;
 
@@ -269,6 +256,7 @@ const initScrollToBottom = async (panel) => {
 
   if (panel && config.scrollToBottom !== false) {
     initScrollToBottom(panel);
+    console.log("[Windsurf Panel] 滚动按钮监听已启动");
   }
 
   if (config.promptEnhance?.enabled) {
