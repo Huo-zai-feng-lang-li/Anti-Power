@@ -19,8 +19,7 @@
         </p>
 
         <p class="about-qq">
-          QQ 交流群:
-          <a href="#" @click.prevent="openQQGroup" class="qq-link">993975349</a>
+          <a href="#" @click.prevent="openWechat" class="qq-link">微信公众号</a>
         </p>
 
         <div class="about-actions">
@@ -93,7 +92,7 @@ async function checkUpdate() {
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
 
     const res = await fetch(
-      `https://api.github.com/repos/daoif/Antigravity-Power-Pro/releases/latest`,
+      `https://api.github.com/repos/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases/latest`,
       {
         signal: controller.signal,
       },
@@ -124,9 +123,9 @@ async function openGitHub() {
   await openUrl(props.githubUrl);
 }
 
-async function openQQGroup() {
+async function openWechat() {
   const { openUrl } = await import("@tauri-apps/plugin-opener");
-  await openUrl("https://qm.qq.com/q/AHUKoyLVKg");
+  await openUrl("https://mp.weixin.qq.com/s/4qIBy5UUtAkEvNwHAej13Q");
 }
 </script>
 

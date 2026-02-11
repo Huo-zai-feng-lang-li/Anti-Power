@@ -6,3 +6,5 @@ windsurf-panel/config.json
 manual-install.md
 .DS_Store
 Thumbs.db
+windsurf-panel/bridge-proxy.log
+anti-power.sh

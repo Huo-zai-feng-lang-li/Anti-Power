@@ -36,12 +36,15 @@ pub fn get_all_files_runtime() -> Result<Vec<(String, String)>, String> {
     if cfg!(debug_assertions) {
         let patches_dir = find_patches_dir()
             .ok_or_else(|| "未找到 patches 目录，请从项目根目录或 patcher 目录启动".to_string())?;
+        let source_map: std::collections::HashMap<&str, &str> =
+            EMBEDDED_SOURCE_MAP.iter().cloned().collect();
         let mut files = Vec::new();
-        for (relative_path, _) in get_all_files() {
-            let full_path = patches_dir.join(relative_path);
+        for (key, _) in get_all_files() {
+            let source = source_map.get(key).unwrap_or(&key);
+            let full_path = patches_dir.join(source);
             let content = fs::read_to_string(&full_path)
                 .map_err(|e| format!("读取补丁文件失败 {:?}: {}", full_path, e))?;
-            files.push((relative_path.to_string(), content));
+            files.push((key.to_string(), content));
         }
         return Ok(files);
     }

@@ -24,8 +24,6 @@ if (window.trustedTypes && !window.trustedTypes.defaultPolicy) {
 const SCRIPT_BASE = new URL("./", import.meta.url).href;
 
 const DEFAULT_CONFIG = {
-  fontSizeEnabled: false,
-  fontSize: 16,
   promptEnhance: {
     enabled: false,
     provider: "anthropic",
@@ -65,24 +63,6 @@ const loadStyle = (href) => {
     link.onerror = () => reject(new Error(`Failed to load CSS: ${fullHref}`));
     document.head.appendChild(link);
   });
-};
-
-const applyFontSize = (userConfig) => {
-  const panel = document.getElementById("windsurf.cascadePanel");
-  const root = panel || document.documentElement;
-
-  if (!userConfig?.fontSizeEnabled) {
-    root.style.removeProperty("--windsurf-panel-font-size");
-    return;
-  }
-
-  const size = Number(userConfig.fontSize);
-  if (!Number.isFinite(size) || size <= 0) {
-    root.style.removeProperty("--windsurf-panel-font-size");
-    return;
-  }
-
-  root.style.setProperty("--windsurf-panel-font-size", `${size}px`);
 };
 
 /**
@@ -185,17 +165,21 @@ const initPromptEnhance = async (config) => {
 
 /**
  * 滚动到底部按钮
- * 监听 .cascade-scrollbar 滚动位置, 未到底时显示浮动按钮
+ * 监听 .cascade-scrollbar 滚动位置, 未到底时显示浮动按钮.
+ * React 会替换 .cascade-scrollbar 元素 (切换对话等场景),
+ * 通过 MutationObserver 检测变化并自动重新注入.
  */
 const SCROLL_BTN_ID = "windsurf-scroll-bottom-btn";
 const SCROLL_THRESHOLD = 120;
 
 const initScrollToBottom = async (panel) => {
-  let scrollEl = panel.querySelector(".cascade-scrollbar");
+  const findScrollEl = () => panel.querySelector(".cascade-scrollbar");
+
+  let scrollEl = findScrollEl();
   if (!scrollEl) {
     scrollEl = await new Promise((resolve) => {
       const obs = new MutationObserver(() => {
-        const el = panel.querySelector(".cascade-scrollbar");
+        const el = findScrollEl();
         if (el) { obs.disconnect(); resolve(el); }
       });
       obs.observe(panel, { childList: true, subtree: true });
@@ -204,54 +188,69 @@ const initScrollToBottom = async (panel) => {
   }
   if (!scrollEl) return;
 
-  if (document.getElementById(SCROLL_BTN_ID)) return;
+  let trackedEl = null;
 
-  const btn = document.createElement("button");
-  btn.id = SCROLL_BTN_ID;
-  btn.title = "滚动到底部";
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "16");
-  svg.setAttribute("height", "16");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2.5");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  const p1 = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  p1.setAttribute("points", "7 13 12 18 17 13");
-  const p2 = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  p2.setAttribute("points", "7 6 12 11 17 6");
-  svg.appendChild(p1);
-  svg.appendChild(p2);
-  btn.appendChild(svg);
-
-  const wrapper = scrollEl.parentElement || panel;
-  if (getComputedStyle(wrapper).position === "static") {
-    wrapper.style.position = "relative";
-  }
-  wrapper.appendChild(btn);
-
-  const setVisible = (show) => {
-    btn.style.opacity = show ? "1" : "0";
-    btn.style.pointerEvents = show ? "auto" : "none";
-    btn.style.transform = show ? "translateY(0)" : "translateY(8px)";
+  const createSVG = () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2.5");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    const p1 = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    p1.setAttribute("points", "7 13 12 18 17 13");
+    const p2 = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    p2.setAttribute("points", "7 6 12 11 17 6");
+    svg.appendChild(p1);
+    svg.appendChild(p2);
+    return svg;
   };
 
-  const updateVisibility = () => {
-    const gap = scrollEl.scrollHeight - scrollEl.scrollTop - scrollEl.clientHeight;
-    setVisible(gap > SCROLL_THRESHOLD);
+  const ensureButton = () => {
+    const el = findScrollEl();
+    if (!el) return;
+    if (el === trackedEl && document.getElementById(SCROLL_BTN_ID)) return;
+
+    document.getElementById(SCROLL_BTN_ID)?.remove();
+    trackedEl = el;
+
+    const btn = document.createElement("button");
+    btn.id = SCROLL_BTN_ID;
+    btn.title = "滚动到底部";
+    btn.appendChild(createSVG());
+
+    const wrapper = el.parentElement || panel;
+    if (getComputedStyle(wrapper).position === "static") {
+      wrapper.style.position = "relative";
+    }
+    wrapper.appendChild(btn);
+
+    const update = () => {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const show = gap > SCROLL_THRESHOLD;
+      btn.style.opacity = show ? "1" : "0";
+      btn.style.pointerEvents = show ? "auto" : "none";
+      btn.style.transform = show ? "translateY(0)" : "translateY(8px)";
+    };
+
+    btn.addEventListener("click", () => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+    });
+    el.addEventListener("scroll", update, { passive: true });
+    new ResizeObserver(update).observe(el);
+    update();
   };
 
-  btn.addEventListener("click", () => {
-    scrollEl.scrollTo({ top: scrollEl.scrollHeight, behavior: "smooth" });
-  });
+  ensureButton();
 
-  scrollEl.addEventListener("scroll", updateVisibility, { passive: true });
-  updateVisibility();
-
-  const resizeObs = new ResizeObserver(updateVisibility);
-  resizeObs.observe(scrollEl);
+  let debounce = null;
+  new MutationObserver(() => {
+    clearTimeout(debounce);
+    debounce = setTimeout(ensureButton, 200);
+  }).observe(panel, { childList: true, subtree: true });
 };
 
 (async () => {
@@ -266,8 +265,6 @@ const initScrollToBottom = async (panel) => {
   const config = await loadConfig();
 
   const panel = await waitForCascadePanel();
-
-  applyFontSize(config);
 
   if (panel) {
     initScrollToBottom(panel);

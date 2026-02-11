@@ -519,10 +519,6 @@ fn restore_backup_files(extensions_dir: &PathBuf, workbench_dir: &PathBuf) -> Re
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WindsurfFeatureConfig {
-    #[serde(rename = "fontSizeEnabled")]
-    pub font_size_enabled: bool,
-    #[serde(rename = "fontSize")]
-    pub font_size: f32,
     #[serde(rename = "promptEnhance")]
     pub prompt_enhance: PromptEnhanceConfig,
 }
@@ -530,8 +526,6 @@ pub struct WindsurfFeatureConfig {
 impl Default for WindsurfFeatureConfig {
     fn default() -> Self {
         Self {
-            font_size_enabled: false,
-            font_size: 16.0,
             prompt_enhance: PromptEnhanceConfig::default(),
         }
     }
@@ -691,8 +685,6 @@ fn write_windsurf_patches(workbench_dir: &PathBuf, features: &WindsurfFeatureCon
 /// 写入 Windsurf 配置文件
 fn write_windsurf_config_file(config_path: &PathBuf, features: &WindsurfFeatureConfig) -> Result<(), String> {
     let config_content = serde_json::json!({
-        "fontSizeEnabled": features.font_size_enabled,
-        "fontSize": features.font_size,
         "promptEnhance": {
             "enabled": features.prompt_enhance.enabled,
             "provider": features.prompt_enhance.provider,

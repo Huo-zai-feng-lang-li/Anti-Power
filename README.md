@@ -5,8 +5,8 @@
 <h1 align="center">Antigravity-Power-Pro IDE增强补丁</h1>
 
 <p align="center">
-  <a href="https://github.com/daoif/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/版本-v2.5.0-blue.svg" alt="版本">
+  <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
+    <img src="https://img.shields.io/badge/版本-v5.1-blue.svg" alt="版本">
   </a>
   <a href="https://codeium.com/antigravity">
     <img src="https://img.shields.io/badge/支持_Antigravity-v1.14.2-green.svg" alt="Antigravity">
@@ -49,9 +49,8 @@ Antigravity-Power-Pro 以补丁方式增强 Antigravity 和 Windsurf IDE 的对�
 
 | 功能               | 描述                                              |
 | ------------------ | ------------------------------------------------- |
-| **字体大小调节**   | Cascade 面板字体大小自定义                        |
 | **提示词增强**     | 输入框内嵌增强按钮, 一键优化提示词                |
-| **滚动到底部**     | 消息区浮动按钮, 未到底时自动显示, 点击平滑滚动    |
+| **滚动到底部**     | 消息区浮动按钮, 未到底时自动显示, 点击即达底部    |
 
 ### 复制功能亮点
 
@@ -83,7 +82,7 @@ Antigravity-Power-Pro 以补丁方式增强 Antigravity 和 Windsurf IDE 的对�
 1. 前往 Releases 页面下载 `Antigravity-Power-Pro.exe`
 2. 双击运行, 切换到 **Windsurf** 标签页
 3. 程序自动检测 Windsurf 安装路径
-4. 配置字体大小, 提示词增强等功能
+4. 配置提示词增强等功能
 5. 点击 安装补丁, 重启 Windsurf 查看效果
 
 如需手动安装, 下载 Release 中的补丁压缩包 (例如 `Antigravity-Power-Pro-patches.zip`), 并参考 [manual-install.md](patcher/patches/manual-install.md).
@@ -127,7 +126,8 @@ sudo ./Antigravity-Power-Pro.sh
 
 | 补丁版本 | 支持的 Antigravity 版本 | 发布日期   | 更新内容                                                           |
 | -------- | ----------------------- | ---------- | ------------------------------------------------------------------ |
-| v2.5.0   | v1.15.8 / Windsurf      | 2026-02-10 | 新增 Windsurf IDE 支持 (字体调节, 提示词增强, 滚动到底部)         |
+| v5.1     | v1.15.8 / Windsurf      | 2026-02-11 | 提示词增强模块复用优化, 修复滚动按钮, 去除 Windsurf 字体调节     |
+| v2.5.0   | v1.15.8 / Windsurf      | 2026-02-10 | 新增 Windsurf IDE 支持 (提示词增强, 滚动到底部)                   |
 | v2.3.9   | v1.15.8                 | 2026-01-30 | 修复提示词增强功能在受控组件下的输入问题，实现前端自动读取版本号   |
 | v2.3.7   | v1.15.8                 | 2026-01-29 | 新增提示词增强功能, 支持自定义 API/模型                            |
 | v2.2.0   | v1.14.2                 | 2026-01-21 | Manager Mermaid/数学公式渲染, 对话宽度/字号调节, 感谢 @mikessslxxx |

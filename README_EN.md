@@ -5,7 +5,7 @@
 <h1 align="center">Antigravity-Power-Pro Patch</h1>
 
 <p align="center">
-  <a href="https://github.com/daoif/Antigravity-Power-Pro/releases">
+  <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
     <img src="https://img.shields.io/badge/Version-v2.2.0-blue.svg" alt="Version">
   </a>
   <a href="https://codeium.com/antigravity">

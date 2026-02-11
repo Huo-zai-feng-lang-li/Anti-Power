@@ -1,23 +1,6 @@
 /**
- * Windsurf Panel - 字体大小覆盖样式
- * 通过 CSS 变量 --windsurf-panel-font-size 控制 Cascade 面板字体大小
+ * Windsurf Panel - 滚动按钮 + 提示词增强样式
  */
-
-/* Cascade 面板根节点 */
-.chat-client-root {
-  font-size: var(--windsurf-panel-font-size, inherit) !important;
-}
-
-/* 消息区域文本 */
-.chat-client-root .cascade-scrollbar,
-.chat-client-root .cascade-scrollbar * {
-  font-size: var(--windsurf-panel-font-size, inherit) !important;
-}
-
-/* 输入框区域 */
-.chat-client-root [contenteditable][role="textbox"] {
-  font-size: var(--windsurf-panel-font-size, inherit) !important;
-}
 
 /* 滚动到底部按钮 */
 #windsurf-scroll-bottom-btn {
@@ -31,18 +14,18 @@
   width: 28px !important;
   height: 28px !important;
   padding: 0 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(251, 191, 36, 0.4) !important;
   border-radius: 6px !important;
   background: transparent !important;
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: #fbbf24 !important;
   cursor: pointer !important;
   transition: opacity 0.2s, transform 0.2s, background 0.15s, color 0.15s, border-color 0.15s !important;
 }
 
 #windsurf-scroll-bottom-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #fbbf24 !important;
-  border-color: rgba(251, 191, 36, 0.3) !important;
+  background: transparent !important;
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
 }
 
 #windsurf-scroll-bottom-btn:active {
@@ -57,11 +40,3 @@
   z-index: 10 !important;
 }
 
-/* 排除代码块 - 保持等宽字体原始大小 */
-.chat-client-root pre,
-.chat-client-root pre *,
-.chat-client-root code,
-.chat-client-root .monaco-editor,
-.chat-client-root .monaco-editor * {
-  font-size: revert !important;
-}

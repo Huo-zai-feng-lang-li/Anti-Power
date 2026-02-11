@@ -14,7 +14,7 @@ import { getVersion } from "@tauri-apps/api/app";
 
 // 常量
 const APP_VERSION = ref("");
-const GITHUB_URL = "https://github.com/daoif/Antigravity-Power-Pro";
+const GITHUB_URL = "https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro";
 
 const DEFAULT_SYSTEM_PROMPT = `你是一个智能提示词优化器，专门帮助用户生成更有效的 AI 对话提示词。
 
@@ -112,8 +112,6 @@ const isWindsurfInstalled = ref(false);
 const showWindsurfConfirm = ref(false);
 
 const windsurfFeatures = ref({
-  fontSizeEnabled: false,
-  fontSize: 16,
   promptEnhance: {
     enabled: false,
     provider: "anthropic",
@@ -471,27 +469,6 @@ onMounted(async () => {
           @detect="detectWindsurfPath"
           @browse="browseWindsurfPath"
         />
-
-        <section v-if="windsurfPath" class="card">
-          <h3 class="card-title">Windsurf 功能配置</h3>
-
-          <label class="toggle-row">
-            <span>字体大小调节</span>
-            <input type="checkbox" v-model="windsurfFeatures.fontSizeEnabled" />
-          </label>
-
-          <div v-if="windsurfFeatures.fontSizeEnabled" class="slider-row">
-            <span class="slider-label">{{ windsurfFeatures.fontSize }}px</span>
-            <input
-              type="range"
-              min="12"
-              max="28"
-              step="1"
-              v-model.number="windsurfFeatures.fontSize"
-              class="slider"
-            />
-          </div>
-        </section>
 
         <PromptEnhanceCard
           v-if="windsurfPath"

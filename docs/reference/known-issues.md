@@ -24,7 +24,7 @@
 
 2. **纯文本**: 使用反斜杠转义 `\|` 来显示竖线字符
 
-**详细信息**: [Issue #7](https://github.com/daoif/Antigravity-Power-Pro/issues/7)
+**详细信息**: [Issue #7](https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/issues/7)
 
 ---
 
