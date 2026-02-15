@@ -12,6 +12,7 @@ const DEFAULT_CONFIG = {
   tableColor: true,
   fontSizeEnabled: true,
   fontSize: 20,
+  scrollToBottom: true,
   // 提示词增强配置
   promptEnhance: {
     enabled: false,
@@ -93,4 +94,14 @@ const loadTableFix = () => {
   // 启动扫描模块，传入配置
   const { start } = await import("./scan.js");
   start(config);
+
+  // 滚动到底部按钮
+  if (config.scrollToBottom !== false) {
+    try {
+      const scrollMod = await import("./scroll-to-bottom.js");
+      scrollMod.init();
+    } catch (error) {
+      console.warn("[Cascade] 滚动模块加载失败:", error);
+    }
+  }
 })();

@@ -3,21 +3,10 @@
  * 需要使用 --remote-debugging-port=9222 启动, 并打开 Manager 窗口.
  */
 
-const { chromium } = require("playwright");
+const { connectCDP } = require("./cdp-utils");
 
 (async () => {
-  console.log("🔍 正在获取 WebSocket URL...");
-
-  try {
-    // 先通过 HTTP 获取浏览器信息.
-    const response = await fetch("http://127.0.0.1:9222/json/version");
-    const info = await response.json();
-    const wsUrl = info.webSocketDebuggerUrl;
-
-    console.log("🔗 WebSocket URL:", wsUrl);
-
-    const browser = await chromium.connectOverCDP(wsUrl);
-    console.log("✅ 成功连接!");
+  const browser = await connectCDP();
 
     const contexts = browser.contexts();
     for (const context of contexts) {
@@ -99,10 +88,9 @@ const { chromium } = require("playwright");
     }
 
     await browser.close();
-  } catch (error) {
-    console.error("❌ 错误:", error.message);
-    console.log("\n💡 请确保:");
-    console.log("   1. Antigravity 以 --remote-debugging-port=9222 启动");
-    console.log("   2. Manager 窗口已打开");
-  }
-})();
+})().catch((error) => {
+  console.error("❌ 错误:", error.message);
+  console.log("\n💡 请确保:");
+  console.log("   1. Antigravity 以 --remote-debugging-port=9222 启动");
+  console.log("   2. Manager 窗口已打开");
+});

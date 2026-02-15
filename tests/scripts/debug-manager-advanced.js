@@ -1,30 +1,11 @@
 // 高级诊断脚本, 用于定位 Manager 窗口加载与渲染问题.
 // 需要 Antigravity 以 --remote-debugging-port=9222 启动并打开 Manager 窗口.
-const { chromium } = require('playwright');
+const { connectCDP } = require('./cdp-utils');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {
-  console.log('[INFO] Fetching WebSocket URL...');
-
-  let wsUrl;
-  try {
-    const response = await fetch('http://127.0.0.1:9222/json/version');
-    const info = await response.json();
-    wsUrl = info.webSocketDebuggerUrl;
-  } catch (err) {
-    console.error('[ERROR] Failed to fetch WebSocket URL:', err?.message || err);
-    process.exit(1);
-  }
-
-  if (!wsUrl) {
-    console.error('[ERROR] No WebSocket URL found. Is Antigravity running with --remote-debugging-port=9222?');
-    process.exit(1);
-  }
-
-  console.log('[INFO] WebSocket URL:', wsUrl);
-
-  const browser = await chromium.connectOverCDP(wsUrl);
+  const browser = await connectCDP();
   const contexts = browser.contexts();
   const allPages = [];
   const candidates = [];

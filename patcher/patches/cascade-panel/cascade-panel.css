@@ -123,3 +123,35 @@ body {
     color: #22c55e;
     opacity: 1 !important;
 }
+
+/* ── 滚动到底部按钮 ── */
+#cascade-scroll-bottom-btn {
+    position: sticky;
+    bottom: 12px;
+    left: calc(100% - 44px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    border-radius: 6px;
+    background: var(--vscode-editor-background, rgba(30, 30, 30, 0.85));
+    color: #fbbf24;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.2s, background 0.15s, color 0.15s,
+        border-color 0.15s;
+    pointer-events: none;
+    opacity: 0;
+}
+
+#cascade-scroll-bottom-btn:hover {
+    color: #ef4444;
+    border-color: #ef4444;
+}
+
+#cascade-scroll-bottom-btn:active {
+    transform: scale(0.95) !important;
+}

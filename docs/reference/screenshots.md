@@ -7,6 +7,7 @@
 ## 模仿AugmentCode 提示词增强
 ![提示词增强效果](../assets/images/7.gif)
 
+
 ## Mermaid 流程图渲染
 
 原版 Antigravity 只能显示 Mermaid 源代码, 安装补丁后可以渲染为流程图.

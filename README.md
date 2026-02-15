@@ -32,7 +32,7 @@
 Antigravity-Power-Pro 以补丁方式增强 Antigravity 和 Windsurf IDE 的对话体验. 提供 Mermaid 渲染, 数学公式渲染, 一键复制, 表格颜色修复, 字号调节, 提示词增强, 一键滚动到底部等能力. 我们希望通过社区协作持续完善体验, 欢迎提交 Issue 或 Pull Request.
 
 ---
-
+![提示词增强效果](./docs/assets/images/8.gif)
 ## 功能特性
 
 | 功能                 | 描述                                              |

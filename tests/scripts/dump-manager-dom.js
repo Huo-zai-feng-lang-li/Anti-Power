@@ -1,27 +1,18 @@
 /**
  * 导出 Manager 窗口 (Launchpad) 的 DOM 结构.
  *
- * 使用方法:
- * node scripts/dump-manager-dom.js "ws://127.0.0.1:9222/devtools/browser/xxx"
+ * 用法:
+ *   node scripts/dump-manager-dom.js                    # 自动发现
+ *   node scripts/dump-manager-dom.js "ws://..."         # 手动
  */
 
-const { chromium } = require('playwright');
+const { connectCDP } = require('./cdp-utils');
 const fs = require('fs');
 const path = require('path');
 
 async function main() {
-    const wsUrl = process.argv[2];
-
-    if (!wsUrl) {
-        console.log('❌ 请提供 WebSocket URL 作为参数！');
-        console.log('用法: node scripts/dump-manager-dom.js "ws://127.0.0.1:9222/devtools/browser/xxx"');
-        process.exit(1);
-    }
-
-    console.log(`🔗 正在连接到: ${wsUrl}\n`);
-
     try {
-        const browser = await chromium.connectOverCDP(wsUrl);
+        const browser = await connectCDP(process.argv[2]);
         console.log('✅ 成功连接!\n');
 
         const contexts = browser.contexts();
