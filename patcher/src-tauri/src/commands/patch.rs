@@ -29,9 +29,9 @@ impl Default for PromptEnhanceConfig {
         Self {
             enabled: true,
             provider: "openai".to_string(),
-            api_base: "https://api.freemodel.dev/v1".to_string(),
-            api_key: "fe_oa_d489e9161b01e3cb8954bf50c5a8cd80fdb4b25e5e8870f9".to_string(),
-            model: "gpt-5.4-mini".to_string(),
+            api_base: "https://tokenrhythm.studio/v1".to_string(),
+            api_key: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0".to_string(),
+            model: "deepseek-v4-flash".to_string(),
             system_prompt: DEFAULT_SYSTEM_PROMPT.to_string(),
         }
     }

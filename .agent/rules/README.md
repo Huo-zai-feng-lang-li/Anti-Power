@@ -33,6 +33,14 @@ globs: *
 - `patcher/src/`: 安装工具 UI 层，配置功能开关、检查各依赖可用性与系统同步。
 - `.agent/`: AI Agent 自定义准则、工作流程的约束核心与知识挂载。
 
+## 安装器 API 连接测试
+
+- 提示词增强的“测试连接”属于安装器链路，不属于 IDE 运行时补丁链路。
+- 前端入口: `patcher/src/components/PromptEnhanceCard.vue`，点击测试时必须把当前表单里的 `provider`、`apiBase`、`apiKey`、`model` 原样传给 Tauri 命令。
+- 后端入口: `patcher/src-tauri/src/commands/prompt.rs` 的 `test_prompt_connection`。该命令使用当前传入的 API 配置发起真实请求；只允许硬编码最小测试 prompt（当前为 `"Hi"`）和 `max_tokens`，禁止硬编码 API 地址、API Key 或模型。
+- OpenAI 兼容接口走 `{apiBase}/chat/completions`；Anthropic 走 `{apiBase}/v1/messages`。
+- 修连接测试时优先修改安装器前后端，不要误改 `shared/enhance.js`；`shared/enhance.js` 只负责 IDE 内实际提示词增强。
+
 ## IDE 内部 Hook 锚标与漏洞机制
 
 ### Antigravity
@@ -43,17 +51,18 @@ globs: *
 - 聚合门户: `resources/app/out/vs/code/electron-browser/workbench/workbench.html`
 - 挂载须知: 替换修改该文件将不可避免地招致 “程序防篡改校验（安装似乎损坏）”，所以卸载功能被要求绝对退回 `.bak` 文件。并且 Windsurf 设置了严防死守的 `require-trusted-types-for`，已透过 `default` Trusted Types 全局下推来豁免。
 
-### DOM 选择器红线 (v2.6.61 取证结论)
+### DOM 选择器红线
 
 > **两个 IDE 页面均使用 Tailwind 工具类，严禁在补丁中硬编码依赖语义化类名 (如 `.chat-container`、`.agent-view-container`)。**
 
 | 环境 | CSS 类名体系 | 可用锚点 | 滚动容器识别策略 |
 |------|-------------|----------|-----------------|
 | **cascade-panel** (侧边栏) | Tailwind 工具类 (`.overflow-y-auto`, `.overflow-auto`) | `.antigravity-agent-side-panel` (补丁自注入) | 按 `.overflow-y-auto` + `scrollHeight` 降序取最大 |
-| **manager-panel** (Manager) | 纯 Tailwind 工具类 (`scrollbar-hide`, `overflow-y-auto`)，**无任何语义锚点** | `document.body` (独占页面) | 按 `getComputedStyle(el).overflowY` + `scrollHeight` 取最大 |
+| **manager-panel** (Manager) | 纯 Tailwind 工具类 (`scrollbar-hide`, `overflow-y-auto`)，**无任何语义锚点** | `document.body` (独占页面) | 按 `getComputedStyle(el).overflowY` + `scrollHeight` 取最大，并保留 `clientWidth >= 350` 的窄栏过滤 |
 
 - **禁止**: 在 `findRoot()` 或 `findScrollEl()` 中使用 `.chat-container`、`.conversation-container`、`.agent-view-container`、`.monaco-workbench` 等 IDE 原生语义类名作为必要条件判断
 - **必须**: 使用特征无关策略 — 遍历 DOM 按 `overflowY` + `scrollHeight` 取最大可滚动元素
+- **Manager 防误触**: Manager 页面存在文件列表、工具区、按钮组等同层 DOM。提示词按钮定位必须绑定“当前输入框邻近容器”，禁止用全局第一个 send/mic/submit 按钮作为兜底挂载点；滚动容器识别必须保留窄栏过滤，避免长列表抢占滚动焦点。
 
 ### 补丁文件修改地图 (双面板 × 双功能)
 
@@ -94,7 +103,7 @@ globs: *
 
 ## 终极架构防护红线
 
-- **虚拟 DOM 劫持准则**: 对框架富文本区施行暴力植入时，**严禁使用 `innerText = ""` 发号施令清理，也严禁依赖浏览器封装的 `execCommand("selectAll")`**。这两种弱鸡手段会立刻招致“光标首尾坍塌”而演变为恶性的“追加 Bug”！必须采用最底层的 Selection/Range API 对容器内全体子节点发动武装级划取：`range.selectNodeContents(input)` 配合 `selection.addRange` 死锁包裹住旧本文后，再行触发 `execCommand("insertText")` 及降级 `paste` 事件。
+- **虚拟 DOM 劫持准则**: 对框架富文本区施行暴力植入时，**严禁使用 `innerText = ""` 发号施令清理，也严禁依赖浏览器封装的 `execCommand("selectAll")`，更禁止用 `insertHTML` 注入 LLM 返回内容**。这类弱手段会触发光标坍塌、追加 Bug、HTML 转义/清洗差异和潜在注入风险。必须采用 Selection/Range API 对容器内全体子节点划取：`range.selectNodeContents(input)` 配合 `selection.addRange` 包裹旧文本后，再触发 `execCommand("insertText")`；失败时用 `ClipboardEvent("paste")` + `text/plain` 降级，并用 `getInputValue(input).trim()` 校验是否写入成功。
 - **UI 状态闭环底线**: LLM 增强与各种大工作量任务派发时，不能允许“点击没反应用户干等”。如果在防守严密的特定环境实在打不穿（比如极少数怪异布局），必须提供安全回退方案并 **触发明显的剪贴板复制提示 (showResultModal) **，拒绝静默失败。
 - **空间焦点抢夺防护**: 向 Manager 类融合会话面板加插按钮或进行长列表追踪时（如滚动条吸底），禁绝贪婪匹配全体 root！这种行为会被窗口内同层文件列表等其他系统级长列表诱发劫夺，必须叠加专属 CSS 限定甚至施加超高 `10000` 权重，锁定专属领域挂载。
 - **环境主权隔离**: `manager-panel/scan.js` 扫描时必须规避并隔离已属于侧边栏 `cascade-panel` 的特有类容（如 `.antigravity-agent-side-panel` 元素），实现跨模块井水不犯河水。位置定点权必须交放给各面板自己管理。绝对定位容器必须加上 `overflow: visible !important` 的超高权柄，防止界面跳变被断层裁剪。

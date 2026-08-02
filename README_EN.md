@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/Version-v2.6.71-gold.svg?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v2.6.72-gold.svg?style=flat-square" alt="Version">
   </a>
   <a href="https://codeium.com/antigravity">
     <img src="https://img.shields.io/badge/Supports_Antigravity-v1.23.2-green.svg?style=flat-square" alt="Antigravity">

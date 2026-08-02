@@ -13,7 +13,7 @@ import ManagerFeatureCard from "./components/ManagerFeatureCard.vue";
 import { getVersion } from "@tauri-apps/api/app";
 
 // 常量
-const APP_VERSION = ref("2.6.71");
+const APP_VERSION = ref("2.6.72");
 const GITHUB_URL = "https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro";
 // 每次更新 DEFAULT_SYSTEM_PROMPT 时递增此版本号，旧版 config 会自动重置
 const SYSTEM_PROMPT_VERSION = 2;
@@ -111,9 +111,9 @@ const windsurfFeatures = ref({
   promptEnhance: {
     enabled: true,
     provider: "openai",
-    apiBase: "https://api.freemodel.dev/v1",
-    apiKey: "fe_oa_d489e9161b01e3cb8954bf50c5a8cd80fdb4b25e5e8870f9",
-    model: "gpt-5.4-mini",
+    apiBase: "https://tokenrhythm.studio/v1",
+    apiKey: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    model: "deepseek-v4-flash",
     systemPrompt: "",
     systemPromptVersion: SYSTEM_PROMPT_VERSION,
   },
@@ -146,8 +146,8 @@ const managerFeatures = ref({
 // ============================================
 // 遗留配置过滤：旧 config.json 中的老默认值不应覆盖新版本默认值
 // ============================================
-const LEGACY_API_BASES = ["http://127.0.0.1:8045/v1", "http://localhost:8045/v1"];
-const LEGACY_MODELS = ["gemini-3-flash", "gemini-2.0-flash", ""];
+const LEGACY_API_BASES = ["http://127.0.0.1:8045/v1", "http://localhost:8045/v1", "https://api.freemodel.dev/v1"];
+const LEGACY_MODELS = ["gemini-3-flash", "gemini-2.0-flash", "gpt-5.4-mini", ""];
 type FeatureDefaultsConfig = {
   featureDefaultsVersion?: number;
   fontSizeEnabled?: boolean;
@@ -203,9 +203,9 @@ function mergePromptEnhance(
   if (disk.apiBase && !LEGACY_API_BASES.includes(disk.apiBase as string)) {
     merged.apiBase = disk.apiBase as string;
   }
-  // apiKey: 磁盘有有效 key 时用磁盘值
-  if (disk.apiKey && (disk.apiKey as string).length > 10) {
-    merged.apiKey = disk.apiKey as string;
+  // apiKey: 磁盘有非空 key 时保留磁盘值（移除了错误的 >10 长度限制）
+  if (disk.apiKey && typeof disk.apiKey === "string" && disk.apiKey.trim() !== "") {
+    merged.apiKey = disk.apiKey.trim();
   }
   // model: 仅在非遗留值时采用磁盘值
   if (disk.model && !LEGACY_MODELS.includes(disk.model as string)) {

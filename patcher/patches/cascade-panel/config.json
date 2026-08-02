@@ -8,9 +8,9 @@
   "placeholder": "🤖Hello、我已就绪，火力即刻全爆💩📢📣",
   "promptEnhance": {
     "enabled": true,
-    "apiBase": "https://api.freemodel.dev/v1",
-    "apiKey": "",
-    "model": "gpt-5.4-mini",
+    "apiBase": "https://tokenrhythm.studio/v1",
+    "apiKey": "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    "model": "deepseek-v4-flash",
     "systemPrompt": ""
   }
 }
