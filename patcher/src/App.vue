@@ -135,9 +135,9 @@ const managerFeatures = ref({
   promptEnhance: {
     enabled: true,
     provider: "openai",
-    apiBase: "https://api.freemodel.dev/v1",
-    apiKey: "fe_oa_d489e9161b01e3cb8954bf50c5a8cd80fdb4b25e5e8870f9",
-    model: "gpt-5.4-mini",
+    apiBase: "https://tokenrhythm.studio/v1",
+    apiKey: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    model: "deepseek-v4-flash",
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     systemPromptVersion: SYSTEM_PROMPT_VERSION,
   },
