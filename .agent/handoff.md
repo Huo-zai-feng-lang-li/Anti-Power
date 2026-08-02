@@ -3,7 +3,7 @@
 ## 当前状态 (Current Status)
 - **版本**: v2.6.72
 - **核心变更**:
-  - **默认 API 配置全量升级**：提示词增强默认配置统一更新为 TokenRhythm（API Base: `https://tokenrhythm.studio/v1`，Model: `deepseek-v4-flash`，ApiKey: `sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0`）。
+  - **默认 API 配置全量升级**：提示词增强默认配置统一更新为 TokenRhythm（API Base: `https://tokenrhythm.studio/v1`，Model: `deepseek-v4-flash`，ApiKey: `sk_tr_***`）。
   - **配置持久化 Bug 彻底修复**：修成了用户自定义 Key/URL 保存后下一次打开又回退默认的持久化 Bug。移除了 `mergePromptEnhance` 中对 `apiKey` 长度必须大于 10 的过度硬编码限制，改用标准非空校验。
   - **清洗黑名单增量对齐**：更新了 `LEGACY_API_BASES` 与 `LEGACY_MODELS`，防止版本初始化合并时误覆盖用户的有效自定义配置。
   - **版本同步与代码上云**：版本号已递增至 `v2.6.72`，通过 `npm run --prefix patcher sync-version` 实现了 6 处版本号全量同步，且代码已提交并推送至 `main` 远程分支。
