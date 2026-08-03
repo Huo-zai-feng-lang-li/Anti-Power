@@ -1,3 +1,6 @@
+import { replaceContenteditableDom } from "./input-replacer.js";
+import { requestPromptApi } from "./request-engine.js";
+
 /**
  * 提示词增强模块
  * 调用自定义 LLM API 优化用户输入的提示词
@@ -387,7 +390,7 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
     temperature: 0.7,
   });
 
-  const response = await directHttpRequest({
+  const response = await requestPromptApi({
     url,
     method: "POST",
     headers: {
@@ -396,6 +399,7 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
     },
     body: bodyStr,
     timeoutMs: 15000,
+    directRequest: directHttpRequest,
   });
 
   if (!response.ok) {
@@ -431,7 +435,7 @@ async function callAnthropicAPI(prompt, contextPrefix = "") {
     messages: [{ role: "user", content: userMessage }],
   });
 
-  const response = await directHttpRequest({
+  const response = await requestPromptApi({
     url,
     method: "POST",
     headers: {
@@ -441,6 +445,7 @@ async function callAnthropicAPI(prompt, contextPrefix = "") {
     },
     body: bodyStr,
     timeoutMs: 15000,
+    directRequest: directHttpRequest,
   });
 
   if (!response.ok) {
@@ -533,7 +538,15 @@ async function setInputValue(input, value) {
       // 1. 强制物理清空原始文本，防止选区在 focus 时坍塌导致追加拼接
       clearContenteditableInput(input);
 
-      // 2. 重新全选空容器并执行 insertText 写入新文本
+      // 2. 先直接替换 DOM 子节点，保证写入动作不会落在旧文本末尾
+      replaceContenteditableDom(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      await sleep(30);
+      let currentVal = getInputValue(input);
+      if (currentVal === normalizedValue) return true;
+
+      // 3. 重新全选空容器并执行 insertText 写入新文本
       range.selectNodeContents(input);
       selection.removeAllRanges();
       selection.addRange(range);
@@ -541,13 +554,13 @@ async function setInputValue(input, value) {
       document.execCommand("insertText", false, value);
       await sleep(50);
 
-      let currentVal = getInputValue(input);
+      currentVal = getInputValue(input);
       if (currentVal === normalizedValue) {
         input.dispatchEvent(new Event("input", { bubbles: true }));
         return true;
       }
 
-      // 3. 校验未通过，尝试 Clipboard Paste 事件降级
+      // 4. 校验未通过，尝试 Clipboard Paste 事件降级
       console.warn("[PromptEnhance] insertText mismatch, attempting Paste fallback...");
       clearContenteditableInput(input);
 
@@ -570,7 +583,7 @@ async function setInputValue(input, value) {
         return true;
       }
 
-      // 4. 若最终依旧不匹配（例如发生脏文本追加），彻底清空污染内容，防止在输入框保留重复拼接
+      // 5. 若最终依旧不匹配（例如发生脏文本追加），彻底清空污染内容，防止在输入框保留重复拼接
       console.warn("[PromptEnhance] Fallback mismatch. Wiping dirty content to prevent duplicates.");
       clearContenteditableInput(input);
       input.dispatchEvent(new Event("input", { bubbles: true }));

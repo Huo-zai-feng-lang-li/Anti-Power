@@ -1,5 +1,7 @@
 const CHANNEL_NAME = "Antigravity_Fetch_Proxy";
 const DEFAULT_TIMEOUT_MS = 10000;
+const PROXY_PING = "PROXY_PING";
+const PROXY_PONG = "PROXY_PONG";
 
 const isLaunchpad = (locationHref) => {
   try {
@@ -61,6 +63,24 @@ const handleFetchRequest = async (channel, data, fetchImpl) => {
   }
 };
 
+const probeRequest = (channel, timeoutMs) =>
+  new Promise((resolve) => {
+    const id = Math.random().toString(36).slice(2);
+    const handler = (event) => {
+      if (event.data?.id !== id || event.data.type !== PROXY_PONG) return;
+      clearTimeout(timeout);
+      channel.removeEventListener("message", handler);
+      resolve(true);
+    };
+    const timeout = setTimeout(() => {
+      channel.removeEventListener("message", handler);
+      resolve(false);
+    }, timeoutMs);
+
+    channel.addEventListener("message", handler);
+    channel.postMessage({ id, type: PROXY_PING });
+  });
+
 export const createProxyTransport = ({
   channelFactory = globalThis.BroadcastChannel,
   fetchImpl = globalThis.fetch,
@@ -75,7 +95,9 @@ export const createProxyTransport = ({
   if (isLaunchpad(locationHref)) {
     channel.addEventListener("message", (event) => {
       const data = event.data || {};
-      if (data.type === "FETCH_REQUEST") {
+      if (data.type === PROXY_PING) {
+        channel.postMessage({ id: data.id, type: PROXY_PONG });
+      } else if (data.type === "FETCH_REQUEST") {
         void handleFetchRequest(channel, data, fetchImpl);
       }
     });
@@ -112,6 +134,7 @@ export const createProxyTransport = ({
 
   return {
     broadcastFetch,
+    probeLaunchpad: (probeTimeoutMs = 500) => probeRequest(channel, probeTimeoutMs),
     close: () => channel.close?.(),
   };
 };
@@ -124,3 +147,6 @@ const defaultTransport =
 export const broadcastFetch = defaultTransport?.broadcastFetch || (() => {
   throw new Error("BroadcastChannel is unavailable");
 });
+
+export const probeLaunchpad =
+  defaultTransport?.probeLaunchpad || (async () => false);

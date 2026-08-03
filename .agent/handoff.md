@@ -1,7 +1,7 @@
-# Antigravity Power Pro Project Handoff (v2.6.72)
+# Antigravity Power Pro Project Handoff (v2.6.78)
 
 ## 当前状态 (Current Status)
-- **版本**: v2.6.72
+- **版本**: v2.6.78
 - **核心变更**:
   - **默认 API 配置全量升级**：提示词增强默认配置统一更新为 TokenRhythm（API Base: `https://tokenrhythm.studio/v1`，Model: `deepseek-v4-flash`，ApiKey: `sk_tr_***`）。
   - **配置持久化 Bug 彻底修复**：修成了用户自定义 Key/URL 保存后下一次打开又回退默认的持久化 Bug。移除了 `mergePromptEnhance` 中对 `apiKey` 长度必须大于 10 的过度硬编码限制，改用标准非空校验。
@@ -17,3 +17,7 @@
 - **配置零覆盖原则**：补丁更新时必须遵循增量合并与用户配置优先原则，严禁强行覆盖用户的自定义 `apiKey` 和 `apiBase`。
 - **DOM 策略**：严禁硬编码 Tailwind 语义类名，必须使用特征无关的 `findScrollEl` 策略。
 - **共享模块**：`shared/enhance.js` 为核心逻辑，修改将同时影响 Cascade 与 Manager 两个面板。
+- **提示词连接**：`shared/request-engine.js` 先短探测 Launchpad 桥接，在线优先代理、离线回退直连；不要把 Manager UI 是否打开作为使用条件。
+- **Launchpad 注入**：`workbench-jetski-agent.html` 必须幂等注入 `./shared/launchpad-proxy.js`，使用 `PROXY_PING/PROXY_PONG` 探测，不得等待完整 API 超时。
+- **输入替换**：`shared/input-replacer.js` 的 `replaceChildren` + `input/change` 事件 + 精确回读校验是防止原文拼接的关键链路。
+- **构建交付**：必须执行 `npm run tauri:build --prefix patcher`；裸 `cargo build --release` 不是可交付的 Tauri 应用。

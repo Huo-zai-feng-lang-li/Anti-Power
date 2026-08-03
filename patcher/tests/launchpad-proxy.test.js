@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   createProxyTransport,
   fetchWithProxyFallback,
+  probeLaunchpad,
   shouldUseLaunchpadProxy,
 } from "../patches/shared/launchpad-proxy.js";
+import { requestPromptApi } from "../patches/shared/request-engine.js";
 
 class FakeBroadcastChannel {
   static channels = new Map();
@@ -87,6 +89,79 @@ test("falls back to Launchpad only after direct fetch fails", async () => {
       throw new Error("CORS blocked");
     },
     proxyFetch: async () => ({ ok: true, status: 200 }),
+  });
+
+  assert.equal(response.status, 200);
+});
+
+test("detects an available Launchpad bridge before sending the API request", async () => {
+  const responder = createTransport({
+    locationHref: "vscode-file://vscode-app/workbench-jetski-agent.html",
+  });
+  const requester = createTransport({ locationHref: "vscode-file://vscode-app/workbench.html" });
+
+  assert.equal(await requester.probeLaunchpad(20), true);
+
+  responder.close();
+  requester.close();
+});
+
+test("reports Launchpad as unavailable without waiting for the API timeout", async () => {
+  const requester = createTransport({ locationHref: "vscode-file://vscode-app/workbench.html" });
+
+  assert.equal(await requester.probeLaunchpad(5), false);
+
+  requester.close();
+});
+
+test("uses the responsive Launchpad bridge before starting a slow direct engine", async () => {
+  let directCalls = 0;
+
+  const response = await requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    runtime: { protocol: "vscode-file:", title: "Antigravity" },
+    probe: async () => true,
+    proxyRequest: async () => ({ ok: true, status: 200 }),
+    directRequest: async () => {
+      directCalls += 1;
+      throw new Error("direct should not run");
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(directCalls, 0);
+});
+
+test("uses direct engine when Launchpad is unavailable", async () => {
+  const response = await requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    runtime: { protocol: "vscode-file:", title: "Antigravity" },
+    probe: async () => false,
+    directRequest: async () => ({ ok: true, status: 200 }),
+  });
+
+  assert.equal(response.status, 200);
+});
+
+test("retries through Launchpad if it appears after a direct failure", async () => {
+  const probes = [false, true];
+  const response = await requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    runtime: { protocol: "vscode-file:", title: "Antigravity" },
+    probe: async () => probes.shift(),
+    directRequest: async () => {
+      throw new Error("CORS blocked");
+    },
+    proxyRequest: async () => ({ ok: true, status: 200 }),
   });
 
   assert.equal(response.status, 200);
