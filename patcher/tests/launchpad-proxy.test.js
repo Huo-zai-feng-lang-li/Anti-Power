@@ -6,7 +6,10 @@ import {
   probeLaunchpad,
   shouldUseLaunchpadProxy,
 } from "../patches/shared/launchpad-proxy.js";
-import { requestPromptApi } from "../patches/shared/request-engine.js";
+import {
+  createBridgeCache,
+  requestPromptApi,
+} from "../patches/shared/request-engine.js";
 
 class FakeBroadcastChannel {
   static channels = new Map();
@@ -129,10 +132,38 @@ test("uses the responsive Launchpad bridge before starting a slow direct engine"
       directCalls += 1;
       throw new Error("direct should not run");
     },
+    bridgeCache: createBridgeCache(),
   });
 
   assert.equal(response.status, 200);
   assert.equal(directCalls, 0);
+});
+
+test("caches Launchpad availability so repeated clicks do not wait on probing", async () => {
+  const bridgeCache = createBridgeCache();
+  let probeCalls = 0;
+
+  const request = () => requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    runtime: { protocol: "vscode-file:", title: "Antigravity" },
+    probe: async () => {
+      probeCalls += 1;
+      return true;
+    },
+    proxyRequest: async () => ({ ok: true, status: 200 }),
+    directRequest: async () => {
+      throw new Error("direct should not run");
+    },
+    bridgeCache,
+  });
+
+  await request();
+  await request();
+
+  assert.equal(probeCalls, 1);
 });
 
 test("uses direct engine when Launchpad is unavailable", async () => {
@@ -144,6 +175,7 @@ test("uses direct engine when Launchpad is unavailable", async () => {
     runtime: { protocol: "vscode-file:", title: "Antigravity" },
     probe: async () => false,
     directRequest: async () => ({ ok: true, status: 200 }),
+    bridgeCache: createBridgeCache(),
   });
 
   assert.equal(response.status, 200);
@@ -162,6 +194,7 @@ test("retries through Launchpad if it appears after a direct failure", async () 
       throw new Error("CORS blocked");
     },
     proxyRequest: async () => ({ ok: true, status: 200 }),
+    bridgeCache: createBridgeCache(),
   });
 
   assert.equal(response.status, 200);

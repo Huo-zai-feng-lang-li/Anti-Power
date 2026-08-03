@@ -21,6 +21,19 @@ let scanTimer = 0;
 
 const getRoot = () => document.getElementById('window-container') || document.body;
 
+const readInputText = (input) =>
+    (input?.innerText || input?.textContent || input?.value || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .trim();
+
+const resolveInput = (input, root, expectedText = '') => {
+    if (input?.isConnected) return input;
+    return querySelectorAllDeep(INPUT_SELECTOR, root).find((candidate) =>
+        !candidate.closest('.antigravity-agent-side-panel') &&
+        (!expectedText || readInputText(candidate) === expectedText),
+    ) || null;
+};
+
 const scheduleScan = () => {
     if (scanTimer) return;
     scanTimer = window.setTimeout(() => {
@@ -82,6 +95,13 @@ const scan = () => {
             input.dataset.enhanceAttached = 'true';
 
             const btn = enhanceModule.createEnhanceButton(async () => {
+                const currentRoot = getRoot();
+                const currentInput = resolveInput(input, currentRoot);
+                if (!currentInput) {
+                    enhanceModule.showErrorModal("找不到当前输入框");
+                    return;
+                }
+
                 const conf = enhanceModule.getConfig();
                 if (!conf.apiKey) {
                     enhanceModule.showErrorModal("请先在 Antigravity-Power-Pro 中配置 apiKey 并设置模型");
@@ -89,16 +109,18 @@ const scan = () => {
                 }
 
                 // 使用 innerText 并剔除零宽字符，确保提示词获取精准
-                const text = (input.innerText || input.value || "").replace(/\u200B/g, "").trim();
+                const text = readInputText(currentInput);
                 if (!text) {
                     enhanceModule.showErrorModal("请先输入需要增强的提示词");
                     return;
                 }
 
-                btn.classList.add("loading");
                 try {
                     const enhanced = await enhanceModule.enhance(text);
-                    const success = await enhanceModule.setInputValue(input, enhanced);
+                    const targetInput = resolveInput(input, currentRoot, text);
+                    const success = targetInput
+                        ? await enhanceModule.setInputValue(targetInput, enhanced)
+                        : false;
                     
                     enhanceModule.showResultModal(
                       enhanced,
@@ -107,8 +129,6 @@ const scan = () => {
                 } catch (error) {
                     console.error("[Manager PromptEnhance] 增强失败:", error);
                     enhanceModule.showErrorModal(error.message);
-                } finally {
-                    btn.classList.remove("loading");
                 }
             });
 

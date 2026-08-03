@@ -117,5 +117,13 @@ globs: *
 - **CORS 事实边界**: `file://` 页面没有浏览器端跨域绕过能力。没有在线 Launchpad 桥接且 Electron 原生 `require` 不可用时，只有开放 CORS 的 API 能走浏览器直连；不要用修改请求头、关闭前端校验等方式伪造修复。
 - **富文本替换红线**: `setInputValue()` 必须先清空旧 Selection/Range，再用 `replaceContenteditableDom()` 原子替换 `contenteditable` 的全部子节点，触发 `input/change`，并用 `getInputValue()` 精确校验；禁止改回仅在末尾插入、`innerText = ""`、`insertHTML` 或无校验的异步粘贴。
 - **共享文件影响面**: `shared/enhance.js` 同时影响 Cascade 与 Manager，`shared/launchpad-proxy.js` 还影响安装器注入的 Launchpad 页面。每次改动至少运行 `node --test patcher/tests/launchpad-proxy.test.js patcher/tests/input-replacer.test.js`，并重新执行 `npm run build --prefix patcher`。
+- **重复点击红线**: 增强按钮必须使用 `createSingleFlight()`/禁用态保证同一输入框只有一个在途增强请求；禁止让两次点击并发写回同一个 contenteditable，否则响应先后顺序会制造拼接和覆盖竞态。
+- **Manager 输入引用**: Manager 扫描器不能只闭包保存初始 DOM 节点；IDE 重渲染后要重新解析仍连接的输入框，再执行写回，并保持侧边栏隔离。
 - **Tauri 构建红线**: 交付给用户的补丁程序必须使用 `npm run tauri:build --prefix patcher` 生成；禁止把 `cargo build --release` 的裸二进制当安装器交付，它会回退到 `devUrl` 并出现 `localhost` 拒绝连接。NSIS 下载失败时，仍可使用已生成的 `patcher/src-tauri/target/release/Antigravity-Power-Pro.exe`，但必须明确说明未生成安装包。
 - **版本同步**: 修改版本只改 `patcher/package.json`，然后运行 `npm run --prefix patcher sync-version`，确认 `tauri.conf.json`、`Cargo.toml`、`App.vue`、`README.md`、`README_EN.md` 六处一致。
+
+## 与道家提示词反重力注入共存
+
+- `道家提示词反重力注入/plugins/dao-proxy-pro/extension.js` 属于 Extension Host 层：当前 Antigravity 运行证据显示它把语言服务器的 `--cloud_code_endpoint` 指向 `http://127.0.0.1:8937`，并提供本地反代；它没有操作 Cascade/Manager 的 contenteditable，也没有使用 `Antigravity_Fetch_Proxy` BroadcastChannel。
+- 因此它不是提示词增强按钮“原文拼接”的直接来源。拼接排查优先看 `setInputValue()`、输入框重渲染和重复点击并发；网络变慢排查优先看 API 端点、Launchpad 探测和上游响应。
+- 提示词增强若要独立走外部 OpenAI 兼容接口，应使用独立的 `https://.../v1`；只有明确把 `apiBase` 配成 `http://127.0.0.1:8937` 或其他道家本地端口时，才会进入道家反代的路由、系统提示词注入和渠道选择链路，结果与延迟也会受其影响。

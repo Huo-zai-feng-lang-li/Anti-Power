@@ -90,6 +90,7 @@ For manual installation, download the patch zip from Releases and refer to [manu
 
 | Patch Version | Supported Antigravity Version | Date       | Update Content                                                                     |
 | ------------- | ----------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| v2.6.78       | v1.23.2 / Windsurf            | 2026-08-03 | **Fix**: Faster Launchpad-aware prompt requests, single-flight button clicks, and atomic contenteditable replacement to prevent prompt concatenation |
 | v2.6.71       | v1.23.2 / Windsurf            | 2026-05-17 | **Fix**: Prompt enhance connection test now runs through the Tauri backend to avoid CORS false failures; added the version sync npm entry |
 | v2.6.70       | v1.23.2 / Windsurf            | 2026-05-17 | **Config**: Added Antigravity sidebar left/right spacing controls, defaulting to 8px / 3px and scoped to Cascade only |
 | v2.6.69       | v1.23.2 / Windsurf            | 2026-05-16 | **清理**: 物理删除复制、Mermaid、Math、表格修复链路；字体调节保留但默认关闭；Manager 提示词扫描改为 DOM 变更触发 |

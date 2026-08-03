@@ -105,6 +105,21 @@ export const init = (initialConfig) => {
 export const isEnabled = () => config.enabled;
 const isAnthropicAPI = () => config.provider === "anthropic" || config.apiBase.includes("anthropic");
 
+export const createSingleFlight = () => {
+  let pending = null;
+
+  return (task) => {
+    if (pending) return pending;
+
+    pending = Promise.resolve()
+      .then(task)
+      .finally(() => {
+        pending = null;
+      });
+    return pending;
+  };
+};
+
 // ============================================
 // 上下文收集
 // ============================================
@@ -529,20 +544,24 @@ async function setInputValue(input, value) {
 
   try {
     input.focus();
-    await sleep(30);
 
     if (input.contentEditable === "true") {
       const selection = window.getSelection();
       const range = document.createRange();
 
-      // 1. 强制物理清空原始文本，防止选区在 focus 时坍塌导致追加拼接
-      clearContenteditableInput(input);
+      // 1. 先锁定旧内容的完整选区；原子替换负责清空，避免 delete 事件触发旧状态回灌
+      range.selectNodeContents(input);
+      selection.removeAllRanges();
+      selection.addRange(range);
 
       // 2. 先直接替换 DOM 子节点，保证写入动作不会落在旧文本末尾
       replaceContenteditableDom(input, value);
+      range.selectNodeContents(input);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
-      await sleep(30);
       let currentVal = getInputValue(input);
       if (currentVal === normalizedValue) return true;
 
@@ -607,8 +626,6 @@ async function setInputValue(input, value) {
       }
       input.dispatchEvent(new Event("input", { bubbles: true }));
       input.dispatchEvent(new Event("change", { bubbles: true }));
-
-      await sleep(50);
       return getInputValue(input) === normalizedValue;
     }
   } catch (e) {
@@ -682,13 +699,32 @@ async function performEnhance() {
 
 export function createEnhanceButton(onClick) {
   const btn = document.createElement("button");
+  const runOnce = createSingleFlight();
   btn.className = "Antigravity-Power-Pro-enhance-btn";
   btn.innerHTML = `
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
     </svg>
   `;
-  btn.addEventListener("click", onClick || performEnhance);
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+
+    btn.disabled = true;
+    btn.dataset.enhancing = "true";
+    btn.setAttribute("aria-busy", "true");
+    btn.classList.add("loading");
+
+    void runOnce(onClick || performEnhance)
+      .catch((error) => {
+        console.error("[PromptEnhance] 未处理的增强错误:", error);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        delete btn.dataset.enhancing;
+        btn.removeAttribute("aria-busy");
+        btn.classList.remove("loading");
+      });
+  });
   return btn;
 }
 

@@ -107,7 +107,6 @@ const initPromptEnhanceButton = async (root = getRoot()) => {
       return;
     }
 
-    btn.classList.add("loading");
     try {
       const enhanced = await enhanceModule.enhance(text);
       const success = await enhanceModule.setInputValue(currentInput, enhanced);
@@ -118,8 +117,6 @@ const initPromptEnhanceButton = async (root = getRoot()) => {
     } catch (error) {
       console.error("[PromptEnhance] 增强失败:", error);
       enhanceModule.showErrorModal(error.message);
-    } finally {
-      btn.classList.remove("loading");
     }
   });
 
