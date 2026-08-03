@@ -34,8 +34,10 @@
 - [x] 代理传输拆分：JS 4/4 通过
 - [x] 安装器注入与卸载清理：Rust 4/4 通过
 - [x] 全量测试、构建和差异检查
-- [ ] 用户重启并通过 CDP 验证已安装桥接
-- [x] 直连优先：支持 CORS 的 API 无需 Ctrl+E
+- [ ] 用户安装 v2.6.79、重启并通过 CDP 验证隐藏桥接与真实响应耗时
+- [x] 自动隐藏桥接：不打开 Ctrl+E 也能建立代理响应端
+- [x] 代理错误不再追加慢速 CORS 直连
+- [x] OpenAI/Anthropic 增强输出长度受限
 
 ## 约束
 
@@ -44,7 +46,7 @@
 
 ## 验证证据
 
-- `node --test patcher/tests/launchpad-proxy.test.js`：6 passed。
+- `node --test patcher/tests/launchpad-proxy.test.js patcher/tests/input-replacer.test.js`：19 passed。
 - `cargo test --manifest-path patcher/src-tauri/Cargo.toml`：4 passed，0 failed。
 - `npm run build --prefix patcher`：成功。
 - Release executable：`patcher/src-tauri/target/release/Antigravity-Power-Pro.exe` 已生成。
@@ -52,6 +54,7 @@
 - `git diff --check`：通过。
 - `cargo fmt --check`：未通过，原因是仓库既有多文件格式差异；未执行全仓格式化。
 - NSIS 打包：失败于下载外部 `nsis-3.11.zip` 超时。
+- GitHub Actions `30804118822`：成功，已发布 `v2.6.79` 安装包。
 
 ## 构建产物纠正
 

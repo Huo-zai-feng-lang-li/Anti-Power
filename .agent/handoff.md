@@ -1,8 +1,8 @@
-# 最新接续状态 (2026-08-03 17:53)
+# 最新接续状态 (2026-08-03 18:13)
 
 ## 核心进展
 - v2.6.79 已完成代码修复：自动隐藏 Launchpad 桥接、代理请求超时透传、代理失败不再追加慢速 CORS 直连、增强输出长度受限。
-- v2.6.78 已发布；v2.6.79 尚未提交、打 tag、推送和发布。
+- 已提交 `eab40f1`、打 tag `v2.6.79`、推送 `main`，GitHub Actions `30804118822` 成功并生成安装包。
 
 ## 核心动机与背景 (Motivation & Background)
 - 现场错误为 `API 直连失败: Failed to fetch`，同时提示词增强响应偏慢。
@@ -17,12 +17,13 @@
 - `patcher/patches/shared/enhance.js`：OpenAI `max_tokens=768`、Anthropic `max_tokens=1024`。
 
 ## 待办事项 (Next Steps)
-- [ ] 运行全量前端构建与 Tauri 构建。
+- [x] 运行全量前端构建与 Tauri 构建；本地 NSIS 下载超时，但 CI 已成功生成安装包。
 - [ ] 安装新版本后重启 Antigravity，验收不打开 Ctrl+E 时单击、连续点击和二次增强。
 - [ ] 通过 CDP 确认隐藏 `launchpad-bridge.html` 加载，记录真实响应耗时与最终输入内容。
-- [ ] 通过测试后提交 `v2.6.79`、推送并发布安装包。
+- [x] 提交、tag、推送并发布 `v2.6.79`。
 
 ## 关键上下文
 - 目录: `C:\Users\Administrator\Desktop\超级文件\AI-IDE\AI\Antigravity-Power-Pro`
 - 主要文件: `patcher/patches/shared/request-engine.js`、`patcher/patches/shared/launchpad-proxy.js`、`patcher/patches/shared/enhance.js`、`patcher/patches/launchpad-bridge.html`、`patcher/src-tauri/src/commands/patch.rs`
-- 已验证: JS 18/18、Rust 4/4、3 个修改后的 JS 文件 `node --check` 通过。
+- 已验证: JS 19/19、Rust 4/4、3 个修改后的 JS 文件 `node --check` 通过、前端构建通过。
+- 安装包: `https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases/download/v2.6.79/Antigravity-Power-Pro_2.6.79_x64-setup.exe`
