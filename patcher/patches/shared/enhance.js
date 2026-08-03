@@ -60,27 +60,36 @@ let config = { ...DEFAULT_CONFIG };
 
 // 初始化配置
 try {
-  const savedConfig = localStorage.getItem("Antigravity_PromptEnhance_Config");
-  if (savedConfig) {
-    const parsed = JSON.parse(savedConfig);
-    // 强制清理 legacy 错误配置
-    if (parsed.apiBase && parsed.apiBase.includes("127.0.0.1:8045")) {
-      console.log("[PromptEnhance] 清理旧版本地代理地址，重置为 Freemodel");
-      parsed.apiBase = DEFAULT_CONFIG.apiBase;
-      parsed.model = DEFAULT_CONFIG.model;
+  if (typeof localStorage !== "undefined") {
+    const savedConfig = localStorage.getItem("Antigravity_PromptEnhance_Config");
+    if (savedConfig) {
+      const parsed = JSON.parse(savedConfig);
+      // 强制清理 legacy 错误配置
+      if (parsed.apiBase && parsed.apiBase.includes("127.0.0.1:8045")) {
+        console.log("[PromptEnhance] 清理旧版本地代理地址，重置为 Freemodel");
+        parsed.apiBase = DEFAULT_CONFIG.apiBase;
+        parsed.model = DEFAULT_CONFIG.model;
+      }
+      config = { ...config, ...parsed };
     }
-    config = { ...config, ...parsed };
   }
 } catch (e) {
   console.error("[PromptEnhance] 加载配置失败:", e);
 }
 
 // 供外部更新配置的方法
-window.updatePromptEnhanceConfig = (newConfig) => {
-  config = { ...config, ...newConfig };
-  localStorage.setItem("Antigravity_PromptEnhance_Config", JSON.stringify(config));
-  console.log("[PromptEnhance] 配置已更新", config);
+const setGlobalUpdateFn = (fn) => {
+  if (typeof window !== "undefined") window.updatePromptEnhanceConfig = fn;
+  if (typeof globalThis !== "undefined") globalThis.updatePromptEnhanceConfig = fn;
 };
+
+setGlobalUpdateFn((newConfig) => {
+  config = { ...config, ...newConfig };
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("Antigravity_PromptEnhance_Config", JSON.stringify(config));
+  }
+  console.log("[PromptEnhance] 配置已更新", config);
+});
 
 export const init = (initialConfig) => {
   if (initialConfig) {
