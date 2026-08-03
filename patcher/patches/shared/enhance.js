@@ -166,6 +166,50 @@ function buildContextPrefix() {
 // ============================================
 
 /**
+ * 深入检索可用 Node.js require 句柄
+ * 完美兼容 VSCode AMD 加载器 (require.nodeRequire)、Electron contextIsolation 沙箱与纯 Node 环境
+ */
+function getNativeRequire() {
+  try {
+    // 1. VSCode AMD 加载器的 nodeRequire 专有入口 (VSCode 渲染进程穿透 CORS 的黄金钥匙)
+    if (typeof require === "function" && typeof require.nodeRequire === "function") {
+      return (mod) => require.nodeRequire(mod);
+    }
+    if (typeof window !== "undefined" && window.require && typeof window.require.nodeRequire === "function") {
+      return (mod) => window.require.nodeRequire(mod);
+    }
+    if (typeof top !== "undefined" && top !== window && top.require && typeof top.require.nodeRequire === "function") {
+      return (mod) => top.require.nodeRequire(mod);
+    }
+    if (typeof parent !== "undefined" && parent !== window && parent.require && typeof parent.require.nodeRequire === "function") {
+      return (mod) => parent.require.nodeRequire(mod);
+    }
+
+    // 2. 标准 Node.js / Electron require 入口
+    if (typeof require === "function") return require;
+    if (typeof window !== "undefined" && typeof window.require === "function") return window.require;
+    if (typeof globalThis !== "undefined" && typeof globalThis.require === "function") return globalThis.require;
+    if (typeof top !== "undefined" && top !== window && typeof top.require === "function") return top.require;
+    if (typeof parent !== "undefined" && parent !== window && typeof parent.require === "function") return parent.require;
+
+    // 3. Electron process.mainModule 句柄
+    const getProc = () => {
+      if (typeof process !== "undefined") return process;
+      if (typeof window !== "undefined" && window.process) return window.process;
+      if (typeof globalThis !== "undefined" && globalThis.process) return globalThis.process;
+      return null;
+    };
+    const proc = getProc();
+    if (proc && proc.mainModule && typeof proc.mainModule.require === "function") {
+      return (mod) => proc.mainModule.require(mod);
+    }
+  } catch (e) {
+    console.warn("[PromptEnhance] getNativeRequire 检索警告:", e);
+  }
+  return null;
+}
+
+/**
  * 极速直连网络请求引擎 (Triple-Engine HTTP Client)
  * 优先使用 Electron/Node 原生 https 模块 (彻底避开浏览器 CORS/CSP 跨域限制)
  * 降级使用 Standard fetch
@@ -174,12 +218,7 @@ function buildContextPrefix() {
 async function directHttpRequest({ url, method = "POST", headers = {}, body = "", timeoutMs = 15000 }) {
   // 1. 优先尝试 Node.js 原生 https/http 模块 (绕过 CORS 跨域)
   try {
-    const getRequire = () => {
-      if (typeof window !== "undefined" && typeof window.require === "function") return window.require;
-      if (typeof globalThis !== "undefined" && typeof globalThis.require === "function") return globalThis.require;
-      return null;
-    };
-    const reqFn = getRequire();
+    const reqFn = getNativeRequire();
     if (reqFn) {
       const https = reqFn("https");
       const http = reqFn("http");
@@ -190,7 +229,7 @@ async function directHttpRequest({ url, method = "POST", headers = {}, body = ""
         const transport = parsedUrl.protocol === "https:" ? https : http;
 
         return await new Promise((resolve, reject) => {
-          const bodyBuf = Buffer.from(body, "utf-8");
+          const bodyBuf = Buffer.from ? Buffer.from(body, "utf-8") : body;
           const reqOptions = {
             hostname: parsedUrl.hostname,
             port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
@@ -198,7 +237,7 @@ async function directHttpRequest({ url, method = "POST", headers = {}, body = ""
             method: method,
             headers: {
               ...headers,
-              "Content-Length": bodyBuf.length,
+              "Content-Length": typeof bodyBuf === "string" ? String(bodyBuf.length) : String(bodyBuf.byteLength || bodyBuf.length),
             },
             timeout: timeoutMs,
           };
