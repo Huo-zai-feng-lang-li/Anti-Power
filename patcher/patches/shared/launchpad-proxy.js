@@ -3,13 +3,15 @@ const DEFAULT_TIMEOUT_MS = 10000;
 const PROXY_PING = "PROXY_PING";
 const PROXY_PONG = "PROXY_PONG";
 
-const isLaunchpad = (locationHref) => {
+const isProxyHost = (locationHref) => {
   try {
-    return new URL(locationHref).pathname
-      .toLowerCase()
-      .endsWith("/workbench-jetski-agent.html");
+    const pathname = new URL(locationHref).pathname.toLowerCase();
+    return pathname.endsWith("/workbench-jetski-agent.html")
+      || pathname.endsWith("/launchpad-bridge.html");
   } catch {
-    return locationHref.toLowerCase().endsWith("/workbench-jetski-agent.html");
+    const pathname = locationHref.toLowerCase();
+    return pathname.endsWith("/workbench-jetski-agent.html")
+      || pathname.endsWith("/launchpad-bridge.html");
   }
 };
 
@@ -92,7 +94,7 @@ export const createProxyTransport = ({
   }
 
   const channel = new channelFactory(CHANNEL_NAME);
-  if (isLaunchpad(locationHref)) {
+  if (isProxyHost(locationHref)) {
     channel.addEventListener("message", (event) => {
       const data = event.data || {};
       if (data.type === PROXY_PING) {
@@ -103,7 +105,7 @@ export const createProxyTransport = ({
     });
   }
 
-  const broadcastFetch = (url, options) =>
+  const broadcastFetch = (url, options, requestTimeoutMs = timeoutMs) =>
     new Promise((resolve, reject) => {
       const id = Math.random().toString(36).slice(2);
       const handler = (event) => {
@@ -123,10 +125,13 @@ export const createProxyTransport = ({
           json: async () => data.data,
         });
       };
+      const effectiveTimeoutMs = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
+        ? requestTimeoutMs
+        : timeoutMs;
       const timeout = setTimeout(() => {
         channel.removeEventListener("message", handler);
         reject(new Error("Proxy Fetch Timeout (Is Launchpad open?)"));
-      }, timeoutMs);
+      }, effectiveTimeoutMs);
 
       channel.addEventListener("message", handler);
       channel.postMessage({ id, type: "FETCH_REQUEST", url, options });

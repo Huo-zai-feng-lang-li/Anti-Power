@@ -109,6 +109,18 @@ test("detects an available Launchpad bridge before sending the API request", asy
   requester.close();
 });
 
+test("accepts the hidden Launchpad bridge page as a proxy responder", async () => {
+  const responder = createTransport({
+    locationHref: "vscode-file://vscode-app/launchpad-bridge.html",
+  });
+  const requester = createTransport({ locationHref: "vscode-file://vscode-app/workbench.html" });
+
+  assert.equal(await requester.probeLaunchpad(20), true);
+
+  responder.close();
+  requester.close();
+});
+
 test("reports Launchpad as unavailable without waiting for the API timeout", async () => {
   const requester = createTransport({ locationHref: "vscode-file://vscode-app/workbench.html" });
 
@@ -137,6 +149,132 @@ test("uses the responsive Launchpad bridge before starting a slow direct engine"
 
   assert.equal(response.status, 200);
   assert.equal(directCalls, 0);
+});
+
+test("creates a bridge before falling back to direct fetch", async () => {
+  let ensureCalls = 0;
+  let directCalls = 0;
+
+  const response = await requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    runtime: { protocol: "vscode-file:", title: "Antigravity", href: "vscode-file://vscode-app/workbench.html" },
+    probe: async () => false,
+    ensureBridge: async () => {
+      ensureCalls += 1;
+      return true;
+    },
+    proxyRequest: async () => ({ ok: true, status: 200 }),
+    directRequest: async () => {
+      directCalls += 1;
+      throw new Error("direct should not run");
+    },
+    bridgeCache: createBridgeCache(),
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(ensureCalls, 1);
+  assert.equal(directCalls, 0);
+});
+
+test("auto-loads a hidden bridge page when the probe is initially offline", async () => {
+  const previousDocument = globalThis.document;
+  const frames = [];
+  const probes = [false, true];
+  globalThis.document = {
+    querySelector: () => null,
+    createElement: () => ({
+      style: {},
+      setAttribute: () => {},
+      addEventListener: (type, listener) => {
+        if (type === "load") queueMicrotask(listener);
+      },
+      remove: () => {},
+    }),
+    body: {
+      appendChild: (frame) => frames.push(frame),
+    },
+  };
+
+  try {
+    const response = await requestPromptApi({
+      url: "https://api.example.test/chat",
+      method: "POST",
+      headers: {},
+      body: "{}",
+      runtime: {
+        protocol: "vscode-file:",
+        title: "Antigravity",
+        href: "vscode-file://vscode-app/workbench.html",
+      },
+      probe: async () => probes.shift(),
+      proxyRequest: async () => ({ ok: true, status: 200 }),
+      directRequest: async () => {
+        throw new Error("direct should not run");
+      },
+      bridgeCache: createBridgeCache(),
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(frames.length, 1);
+    assert.match(frames[0].src, /launchpad-bridge\.html$/);
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+  }
+});
+
+test("does not append a slow CORS fallback after a proxy failure", async () => {
+  let directCalls = 0;
+
+  await assert.rejects(
+    requestPromptApi({
+      url: "https://api.example.test/chat",
+      method: "POST",
+      headers: {},
+      body: "{}",
+      timeoutMs: 15000,
+      runtime: { protocol: "vscode-file:", title: "Antigravity" },
+      probe: async () => true,
+      proxyRequest: async () => {
+        throw new Error("Proxy Fetch Timeout");
+      },
+      directRequest: async () => {
+        directCalls += 1;
+        throw new Error("CORS fallback");
+      },
+      bridgeCache: createBridgeCache(),
+    }),
+    /Proxy Fetch Timeout/,
+  );
+
+  assert.equal(directCalls, 0);
+});
+
+test("passes the prompt timeout to the proxy transport", async () => {
+  let receivedTimeout;
+
+  await requestPromptApi({
+    url: "https://api.example.test/chat",
+    method: "POST",
+    headers: {},
+    body: "{}",
+    timeoutMs: 2345,
+    runtime: { protocol: "vscode-file:", title: "Antigravity" },
+    probe: async () => true,
+    proxyRequest: async (...args) => {
+      receivedTimeout = args[2];
+      return { ok: true, status: 200 };
+    },
+    directRequest: async () => {
+      throw new Error("direct should not run");
+    },
+    bridgeCache: createBridgeCache(),
+  });
+
+  assert.equal(receivedTimeout, 2345);
 });
 
 test("caches Launchpad availability so repeated clicks do not wait on probing", async () => {

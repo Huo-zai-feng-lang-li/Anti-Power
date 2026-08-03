@@ -109,15 +109,16 @@ globs: *
 - **环境主权隔离**: `manager-panel/scan.js` 扫描时必须规避并隔离已属于侧边栏 `cascade-panel` 的特有类容（如 `.antigravity-agent-side-panel` 元素），实现跨模块井水不犯河水。位置定点权必须交放给各面板自己管理。绝对定位容器必须加上 `overflow: visible !important` 的超高权柄，防止界面跳变被断层裁剪。
 - **遗留配置清洗**: App.vue 等设置界面的初始化里，若是探测到过去落后遗留的 API 地址或者淘汰默认值，应通过条件判定予以剔除和静默覆盖，不要给用户留下过时的包袱。
 
-## 提示词增强连接与输入替换防护 (v2.6.78+)
+## 提示词增强连接与输入替换防护 (v2.6.79+)
 
 - **连接链路分层**: `shared/enhance.js` 只负责提示词业务与直接 HTTP 引擎；`shared/request-engine.js` 负责请求编排；`shared/launchpad-proxy.js` 负责 Launchpad BroadcastChannel 桥接。修改其中一层时必须保留另外两层的职责边界。
-- **Launchpad 无界面依赖**: `workbench-jetski-agent.html` 只注入 `./shared/launchpad-proxy.js`，通过 `PROXY_PING/PROXY_PONG` 探测桥接是否在线。Cascade/Manager 侧必须先探测可用桥接再请求；桥接不可用时走 direct HTTP，不能把“打开 Manager 页面”当成前置条件。
-- **代理超时红线**: 禁止把代理探测改成等待完整 API 超时；探测必须使用短超时（当前 350~500ms），代理失败后应立即按既定顺序回退直连或返回原始错误。
+- **Launchpad 无界面依赖**: `workbench-jetski-agent.html` 和 `launchpad-bridge.html` 都可作为 `BroadcastChannel` 响应端。Cascade/Manager 先探测在线桥接；探测失败时自动创建隐藏 `launchpad-bridge.html`，用户无需手动打开 Launchpad 或 Manager 页面。
+- **代理超时红线**: 探测必须使用短超时（当前 120ms），实际代理请求使用调用方的请求超时；在线代理请求失败后直接返回原始代理错误，不得再追加一次慢 CORS 直连。
 - **CORS 事实边界**: `file://` 页面没有浏览器端跨域绕过能力。没有在线 Launchpad 桥接且 Electron 原生 `require` 不可用时，只有开放 CORS 的 API 能走浏览器直连；不要用修改请求头、关闭前端校验等方式伪造修复。
 - **富文本替换红线**: `setInputValue()` 必须先清空旧 Selection/Range，再用 `replaceContenteditableDom()` 原子替换 `contenteditable` 的全部子节点，触发 `input/change`，并用 `getInputValue()` 精确校验；禁止改回仅在末尾插入、`innerText = ""`、`insertHTML` 或无校验的异步粘贴。
 - **共享文件影响面**: `shared/enhance.js` 同时影响 Cascade 与 Manager，`shared/launchpad-proxy.js` 还影响安装器注入的 Launchpad 页面。每次改动至少运行 `node --test patcher/tests/launchpad-proxy.test.js patcher/tests/input-replacer.test.js`，并重新执行 `npm run build --prefix patcher`。
 - **重复点击红线**: 增强按钮必须使用 `createSingleFlight()`/禁用态保证同一输入框只有一个在途增强请求；禁止让两次点击并发写回同一个 contenteditable，否则响应先后顺序会制造拼接和覆盖竞态。
+- **生成长度红线**: 提示词增强请求必须设置有限 `max_tokens`（当前 OpenAI 768、Anthropic 1024），避免模型无界生成拖慢非流式写回。
 - **Manager 输入引用**: Manager 扫描器不能只闭包保存初始 DOM 节点；IDE 重渲染后要重新解析仍连接的输入框，再执行写回，并保持侧边栏隔离。
 - **Tauri 构建红线**: 交付给用户的补丁程序必须使用 `npm run tauri:build --prefix patcher` 生成；禁止把 `cargo build --release` 的裸二进制当安装器交付，它会回退到 `devUrl` 并出现 `localhost` 拒绝连接。NSIS 下载失败时，仍可使用已生成的 `patcher/src-tauri/target/release/Antigravity-Power-Pro.exe`，但必须明确说明未生成安装包。
 - **版本同步**: 修改版本只改 `patcher/package.json`，然后运行 `npm run --prefix patcher sync-version`，确认 `tauri.conf.json`、`Cargo.toml`、`App.vue`、`README.md`、`README_EN.md` 六处一致。

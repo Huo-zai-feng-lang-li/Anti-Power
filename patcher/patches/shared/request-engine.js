@@ -7,10 +7,14 @@ import {
 const PROBE_TIMEOUT_MS = 120;
 const AVAILABLE_CACHE_TTL_MS = 10000;
 const UNAVAILABLE_CACHE_TTL_MS = 500;
+const BRIDGE_FRAME_TIMEOUT_MS = 800;
+const DIRECT_FALLBACK_TIMEOUT_MS = 2500;
+const BRIDGE_FRAME_SELECTOR = "[data-antigravity-power-proxy]";
 
 const getRuntime = () => ({
   protocol: globalThis.location?.protocol || "",
   title: globalThis.document?.title || "",
+  href: globalThis.location?.href || "",
 });
 
 export const createBridgeCache = () => ({
@@ -20,6 +24,7 @@ export const createBridgeCache = () => ({
 });
 
 const defaultBridgeCache = createBridgeCache();
+let bridgeFramePending = null;
 
 const probeBridge = async (probe, bridgeCache, force = false) => {
   const now = Date.now();
@@ -51,6 +56,52 @@ const probeBridge = async (probe, bridgeCache, force = false) => {
   return bridgeCache.pending;
 };
 
+const waitForBridgeFrame = (frame) => new Promise((resolve) => {
+  let settled = false;
+  const finish = () => {
+    if (settled) return;
+    settled = true;
+    resolve();
+  };
+
+  frame.addEventListener?.("load", finish, { once: true });
+  frame.addEventListener?.("error", finish, { once: true });
+  setTimeout(finish, BRIDGE_FRAME_TIMEOUT_MS);
+});
+
+const ensureLaunchpadBridge = async ({
+  runtime,
+  documentRef,
+  probe,
+  bridgeCache,
+}) => {
+  if (!documentRef?.createElement) return false;
+  if (bridgeFramePending) return bridgeFramePending;
+
+  bridgeFramePending = (async () => {
+    const existing = documentRef.querySelector?.(BRIDGE_FRAME_SELECTOR);
+    const frame = existing || documentRef.createElement("iframe");
+    if (!existing) {
+      const href = runtime.href || globalThis.location?.href;
+      if (!href) return false;
+      frame.setAttribute("data-antigravity-power-proxy", "");
+      frame.setAttribute("aria-hidden", "true");
+      frame.tabIndex = -1;
+      frame.style.cssText = "display:none!important;width:0;height:0;border:0";
+      frame.src = new URL("launchpad-bridge.html", href).href;
+      (documentRef.body || documentRef.documentElement)?.appendChild(frame);
+      await waitForBridgeFrame(frame);
+    }
+    const ready = await probeBridge(probe, bridgeCache, true);
+    if (!ready && !existing) frame.remove?.();
+    return ready;
+  })().finally(() => {
+    bridgeFramePending = null;
+  });
+
+  return bridgeFramePending;
+};
+
 export const requestPromptApi = async ({
   url,
   method,
@@ -62,26 +113,42 @@ export const requestPromptApi = async ({
   proxyRequest = broadcastFetch,
   runtime = getRuntime(),
   bridgeCache = defaultBridgeCache,
+  ensureBridge = ensureLaunchpadBridge,
 }) => {
   const useProxy = shouldUseLaunchpadProxy(runtime);
   const request = { url, method, headers, body, timeoutMs };
-  const bridgeReady = useProxy && await probeBridge(probe, bridgeCache);
+  let bridgeReady = useProxy && await probeBridge(probe, bridgeCache);
+
+  if (useProxy && !bridgeReady) {
+    bridgeReady = await ensureBridge({
+      runtime,
+      documentRef: globalThis.document,
+      probe,
+      bridgeCache,
+    });
+  }
 
   if (bridgeReady) {
     try {
-      return await proxyRequest(url, { method, headers, body });
+      return await proxyRequest(url, { method, headers, body }, timeoutMs);
     } catch (error) {
       bridgeCache.available = false;
       bridgeCache.checkedAt = Date.now();
-      console.warn("[PromptEnhance] Launchpad 请求失败，回退直连:", error);
+      console.warn("[PromptEnhance] Launchpad 请求失败:", error);
+      throw error;
     }
   }
 
   try {
-    return await directRequest(request);
+    return await directRequest({
+      ...request,
+      timeoutMs: useProxy
+        ? Math.min(timeoutMs || DIRECT_FALLBACK_TIMEOUT_MS, DIRECT_FALLBACK_TIMEOUT_MS)
+        : timeoutMs,
+    });
   } catch (directError) {
     if (useProxy && !bridgeReady && await probeBridge(probe, bridgeCache, true)) {
-      return proxyRequest(url, { method, headers, body });
+      return proxyRequest(url, { method, headers, body }, timeoutMs);
     }
     throw directError;
   }

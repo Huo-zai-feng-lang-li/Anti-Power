@@ -488,7 +488,15 @@ fn sync_launchpad_proxy(workbench_dir: &PathBuf, enabled: bool) -> Result<(), St
     let content = fs::read_to_string(&html_path)
         .map_err(|e| format!("读取 Launchpad 页面失败: {}", e))?;
     let updated = sync_launchpad_proxy_content(&content, enabled)?;
-    fs::write(&html_path, updated).map_err(|e| format!("写入 Launchpad 代理失败: {}", e))
+    fs::write(&html_path, updated).map_err(|e| format!("写入 Launchpad 代理失败: {}", e))?;
+    if !enabled {
+        let bridge_page = workbench_dir.join("launchpad-bridge.html");
+        if bridge_page.exists() {
+            fs::remove_file(&bridge_page)
+                .map_err(|e| format!("删除 Launchpad 桥接页失败: {}", e))?;
+        }
+    }
+    Ok(())
 }
 
 /// 写入侧边栏补丁文件（extensions 目录 + workbench 目录双路径注入）
@@ -522,6 +530,7 @@ fn write_cascade_patches(extensions_dir: &PathBuf, workbench_dir: &PathBuf, feat
     let patch_files = embedded::get_all_files_runtime()?;
     for (relative_path, content) in patch_files {
         let is_cascade = relative_path == "cascade-panel.html"
+            || relative_path == "launchpad-bridge.html"
             || relative_path.starts_with("cascade-panel/")
             || relative_path.starts_with("shared/");
         if !is_cascade {
@@ -545,6 +554,11 @@ fn write_cascade_patches(extensions_dir: &PathBuf, workbench_dir: &PathBuf, feat
             let wb_path = workbench_dir.join(&relative_path);
             if let Some(p) = wb_path.parent() { fs::create_dir_all(p).ok(); }
             fs::write(&wb_path, &content).ok();
+        }
+        if relative_path == "launchpad-bridge.html" {
+            let wb_path = workbench_dir.join(&relative_path);
+            fs::write(&wb_path, &content)
+                .map_err(|e| format!("写入 Launchpad 桥接页失败 {:?}: {}", wb_path, e))?;
         }
     }
 
@@ -585,6 +599,7 @@ fn write_manager_patches(workbench_dir: &PathBuf, manager_features: &ManagerFeat
         // 只处理 Manager 相关文件 (Antigravity 用 workbench-antigravity.html 覆盖 workbench.html)
         if relative_path != "workbench-jetski-agent.html" && 
            relative_path != "workbench-antigravity.html" &&
+           relative_path != "launchpad-bridge.html" &&
            !relative_path.starts_with("manager-panel/") &&
            !relative_path.starts_with("shared/") {
             continue;

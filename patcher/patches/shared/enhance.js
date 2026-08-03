@@ -398,6 +398,7 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
 
   const bodyStr = JSON.stringify({
     model: config.model,
+    max_tokens: 768,
     messages: [
       { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
@@ -445,7 +446,7 @@ async function callAnthropicAPI(prompt, contextPrefix = "") {
 
   const bodyStr = JSON.stringify({
     model: config.model,
-    max_tokens: 2048,
+    max_tokens: 1024,
     system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });

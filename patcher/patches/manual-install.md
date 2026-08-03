@@ -11,6 +11,7 @@
 - cascade-panel.html
 - cascade-panel/ 目录
 - workbench-jetski-agent.html
+- launchpad-bridge.html
 - manager-panel/ 目录
 - manual-install.md (本文档)
 
@@ -31,7 +32,7 @@
    - 备份 cascade-panel.html -> cascade-panel.html.bak
    - 复制 cascade-panel.html 与 cascade-panel/ 到 extensions\antigravity\
    - 备份 workbench-jetski-agent.html -> workbench-jetski-agent.html.bak
-   - 复制 workbench-jetski-agent.html 与 manager-panel/ 到 workbench\
+   - 复制 workbench-jetski-agent.html、launchpad-bridge.html 与 manager-panel/ 到 workbench\
 4. 重新打开 Antigravity 与 Manager 窗口
 
 ## 配置开关

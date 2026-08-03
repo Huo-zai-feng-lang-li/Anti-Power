@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/Version-v2.6.78-gold.svg?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v2.6.79-gold.svg?style=flat-square" alt="Version">
   </a>
   <a href="https://codeium.com/antigravity">
     <img src="https://img.shields.io/badge/Supports_Antigravity-v1.23.2-green.svg?style=flat-square" alt="Antigravity">
@@ -90,6 +90,7 @@ For manual installation, download the patch zip from Releases and refer to [manu
 
 | Patch Version | Supported Antigravity Version | Date       | Update Content                                                                     |
 | ------------- | ----------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| v2.6.79       | v1.23.2 / Windsurf            | 2026-08-03 | **Fix**: Auto-started hidden Launchpad bridge, removed slow CORS fallback after proxy errors, forwarded request timeouts, and bounded enhancement output |
 | v2.6.78       | v1.23.2 / Windsurf            | 2026-08-03 | **Fix**: Faster Launchpad-aware prompt requests, single-flight button clicks, and atomic contenteditable replacement to prevent prompt concatenation |
 | v2.6.71       | v1.23.2 / Windsurf            | 2026-05-17 | **Fix**: Prompt enhance connection test now runs through the Tauri backend to avoid CORS false failures; added the version sync npm entry |
 | v2.6.70       | v1.23.2 / Windsurf            | 2026-05-17 | **Config**: Added Antigravity sidebar left/right spacing controls, defaulting to 8px / 3px and scoped to Cascade only |

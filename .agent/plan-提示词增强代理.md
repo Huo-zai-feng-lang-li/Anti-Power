@@ -58,3 +58,16 @@
 - `cargo build --release` 不是可交付 Tauri 应用，会回退到 `devUrl=http://localhost:5173`。
 - 正确命令：`npm run tauri:build --prefix patcher`。
 - 该命令已生成并启动原生窗口 `Antigravity-Power-Pro Patcher`；NSIS 仅在最后打包阶段受外部下载超时影响。
+
+## v2.6.79 当前问题与修复目标
+
+- 现场 CDP 已证明主工作台为 `vscode-file:`，Launchpad 页面存在且 `PROXY_PING` 返回成功；因此截图中的 `API 直连失败` 不是按钮或道家插件拼接逻辑，而是桥接暂时不可用或桥接请求超时后错误地继续走 CORS 直连。
+- 当前请求链路的两个放大器：Launchpad 传输默认 10 秒超时，且代理失败后再等待 15 秒直连；最终用户只看到误导性的 `Electron file://` 错误。
+- 修复目标：请求代理使用调用方超时；`vscode-file:` 页面在桥接缺失时自动创建隐藏 Launchpad 桥接页，不依赖 Ctrl+E；已确认桥接在线时，代理失败直接返回真实代理错误，不再追加一次慢直连；OpenAI/Anthropic 提示词增强限制输出长度，减少无效生成等待。
+
+### v2.6.79 验收边界
+
+- 代理桥接正常：只发送一次提示词请求，不进入直连 CORS 回退。
+- 桥接暂时未打开：自动加载隐藏桥接页后再请求，用户不需要手动打开 Launchpad。
+- 桥接和自动加载都失败：快速返回桥接错误；CORS 直连 API 仍保留直连能力。
+- 同一输入框重复点击继续由单飞锁保护；写回继续使用原子替换，不追加旧文本。
