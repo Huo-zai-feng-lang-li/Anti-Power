@@ -166,46 +166,68 @@ function buildContextPrefix() {
 // ============================================
 
 /**
+ * 安全执行属性提取，防御跨域 SecurityError 拦截
+ */
+function safeGet(getter) {
+  try {
+    return getter();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * 深入检索可用 Node.js require 句柄
  * 完美兼容 VSCode AMD 加载器 (require.nodeRequire)、Electron contextIsolation 沙箱与纯 Node 环境
+ * 使用 safeGet 隔离所有可能触发 DOMException/SecurityError 的同源墙访问
  */
 function getNativeRequire() {
-  try {
-    // 1. VSCode AMD 加载器的 nodeRequire 专有入口 (VSCode 渲染进程穿透 CORS 的黄金钥匙)
-    if (typeof require === "function" && typeof require.nodeRequire === "function") {
-      return (mod) => require.nodeRequire(mod);
-    }
-    if (typeof window !== "undefined" && window.require && typeof window.require.nodeRequire === "function") {
-      return (mod) => window.require.nodeRequire(mod);
-    }
-    if (typeof top !== "undefined" && top !== window && top.require && typeof top.require.nodeRequire === "function") {
-      return (mod) => top.require.nodeRequire(mod);
-    }
-    if (typeof parent !== "undefined" && parent !== window && parent.require && typeof parent.require.nodeRequire === "function") {
-      return (mod) => parent.require.nodeRequire(mod);
-    }
-
-    // 2. 标准 Node.js / Electron require 入口
-    if (typeof require === "function") return require;
-    if (typeof window !== "undefined" && typeof window.require === "function") return window.require;
-    if (typeof globalThis !== "undefined" && typeof globalThis.require === "function") return globalThis.require;
-    if (typeof top !== "undefined" && top !== window && typeof top.require === "function") return top.require;
-    if (typeof parent !== "undefined" && parent !== window && typeof parent.require === "function") return parent.require;
-
-    // 3. Electron process.mainModule 句柄
-    const getProc = () => {
-      if (typeof process !== "undefined") return process;
-      if (typeof window !== "undefined" && window.process) return window.process;
-      if (typeof globalThis !== "undefined" && globalThis.process) return globalThis.process;
-      return null;
-    };
-    const proc = getProc();
-    if (proc && proc.mainModule && typeof proc.mainModule.require === "function") {
-      return (mod) => proc.mainModule.require(mod);
-    }
-  } catch (e) {
-    console.warn("[PromptEnhance] getNativeRequire 检索警告:", e);
+  // 1. 当前作用域 require
+  const localReq = safeGet(() => require);
+  if (localReq) {
+    if (typeof localReq.nodeRequire === "function") return (m) => localReq.nodeRequire(m);
+    if (typeof localReq === "function") return localReq;
   }
+
+  // 2. 当前 window 对象 require
+  const winReq = safeGet(() => window.require);
+  if (winReq) {
+    if (typeof winReq.nodeRequire === "function") return (m) => winReq.nodeRequire(m);
+    if (typeof winReq === "function") return winReq;
+  }
+
+  // 3. 全局 globalThis require
+  const globalReq = safeGet(() => globalThis.require);
+  if (globalReq) {
+    if (typeof globalReq.nodeRequire === "function") return (m) => globalReq.nodeRequire(m);
+    if (typeof globalReq === "function") return globalReq;
+  }
+
+  // 4. 顶级窗口 top require (独立 try-catch 防御跨域 SecurityError)
+  const topReq = safeGet(() => (typeof top !== "undefined" && top !== window) ? top.require : null);
+  if (topReq) {
+    if (typeof topReq.nodeRequire === "function") return (m) => topReq.nodeRequire(m);
+    if (typeof topReq === "function") return topReq;
+  }
+
+  // 5. 父窗口 parent require (独立 try-catch 防御跨域 SecurityError)
+  const parentReq = safeGet(() => (typeof parent !== "undefined" && parent !== window) ? parent.require : null);
+  if (parentReq) {
+    if (typeof parentReq.nodeRequire === "function") return (m) => parentReq.nodeRequire(m);
+    if (typeof parentReq === "function") return parentReq;
+  }
+
+  // 6. Electron process 对象的 mainModule.require 入口
+  const proc = safeGet(() => (typeof process !== "undefined" ? process : null)) ||
+               safeGet(() => (typeof window !== "undefined" ? window.process : null)) ||
+               safeGet(() => (typeof globalThis !== "undefined" ? globalThis.process : null));
+  if (proc) {
+    const mainReq = safeGet(() => proc.mainModule && proc.mainModule.require);
+    if (typeof mainReq === "function") {
+      return (m) => proc.mainModule.require(m);
+    }
+  }
+
   return null;
 }
 
@@ -239,6 +261,7 @@ async function directHttpRequest({ url, method = "POST", headers = {}, body = ""
               ...headers,
               "Content-Length": typeof bodyBuf === "string" ? String(bodyBuf.length) : String(bodyBuf.byteLength || bodyBuf.length),
             },
+            rejectUnauthorized: false, // 豁免本地代理/VPN 抓包环境下的 SSL 证书校验阻断
             timeout: timeoutMs,
           };
 
