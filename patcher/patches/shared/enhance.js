@@ -4,8 +4,9 @@
  * 支持 OpenAI 兼容格式和 Anthropic Claude 格式
  * 
  * 功能特性:
- * - 直接替换输入框内容
+ * - 直连 API 极速响应，无需中转代理
  * - 自动收集 IDE 上下文信息
+ * - 物理擦除并替换输入框内容
  * - 简洁的 toast 提示
  */
 
@@ -104,63 +105,6 @@ const CONVERSATION_SELECTORS = [
   "[class*=\"conversation\"]",
 ];
 
-// ============================================
-// Proxy Fetch Logic (Bypass vscode-file:// protocol restrictions)
-// ============================================
-
-const proxyChannel = new BroadcastChannel('Antigravity_Fetch_Proxy');
-
-// Listen for proxy requests
-proxyChannel.onmessage = async (e) => {
-    const { id, type, url, options } = e.data || {};
-    if (type === 'FETCH_REQUEST') {
-        // Only windows that can successfully fetch should respond. 
-        // We know Launchpad (jetski) works.
-        if (!window.location.href.includes('workbench-jetski-agent.html')) return;
-        
-        console.log("[PromptEnhance] Proxy serving request:", url);
-        try {
-            const resp = await fetch(url, options);
-            const ok = resp.ok;
-            const status = resp.status;
-            const data = await resp.json().catch(() => ({}));
-            proxyChannel.postMessage({ id, type: 'FETCH_RESPONSE', ok, status, data });
-        } catch (error) {
-            console.error("[PromptEnhance] Proxy fetch error:", error);
-            proxyChannel.postMessage({ id, type: 'FETCH_RESPONSE', error: error.message });
-        }
-    }
-};
-
-/**
- * Proxy Fetch via BroadcastChannel fallback
- */
-function broadcastFetch(url, options) {
-    return new Promise((resolve, reject) => {
-        const id = Math.random().toString(36).substring(2);
-        const timeout = setTimeout(() => {
-            proxyChannel.removeEventListener('message', handler);
-            reject(new Error("Proxy Fetch Timeout (Is Launchpad open?)"));
-        }, 10000);
-
-        const handler = (e) => {
-            if (e.data && e.data.id === id && e.data.type === 'FETCH_RESPONSE') {
-                clearTimeout(timeout);
-                proxyChannel.removeEventListener('message', handler);
-                if (e.data.error) reject(new Error(e.data.error));
-                else resolve({
-                    ok: e.data.ok,
-                    status: e.data.status,
-                    json: async () => e.data.data
-                });
-            }
-        };
-
-        proxyChannel.addEventListener('message', handler);
-        proxyChannel.postMessage({ id, type: 'FETCH_REQUEST', url, options });
-    });
-}
-
 const NOISE_SELECTORS = [
   ".model-selector-container",
   ".chat-input-container",
@@ -209,7 +153,7 @@ function buildContextPrefix() {
 }
 
 // ============================================
-// LLM 交互
+// LLM 交互 (纯直连模式)
 // ============================================
 
 /**
@@ -231,13 +175,13 @@ export async function enhance(prompt) {
       return await callOpenAIAPI(prompt, contextPrefix);
     }
   } catch (error) {
-    console.error("[PromptEnhance] API Error:", error);
+    console.error("[PromptEnhance] API Direct Fetch Error:", error);
     throw error;
   }
 }
 
 /**
- * 调用 OpenAI 兼容 API
+ * 调用 OpenAI 兼容 API (原生直连)
  */
 async function callOpenAIAPI(prompt, contextPrefix = "") {
   const userMessage = contextPrefix 
@@ -246,35 +190,35 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
 
   const baseUrl = config.apiBase.endsWith("/") ? config.apiBase.slice(0, -1) : config.apiBase;
   const url = `${baseUrl}/chat/completions`;
-  const options = {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.7,
-    }),
-  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   let response;
-  // 在 vscode-file:// 协议下（侧边栏），直接强制使用 Launchpad 代理，绕过 CORS 限制
-  if (location.protocol === "vscode-file:" && !document.title.includes("Launchpad")) {
-    console.log("[PromptEnhance] Detected Sidebar context, using Launchpad proxy...");
-    response = await broadcastFetch(url, options).catch(err => {
-      throw new Error(`代理请求失败: ${err.message}。请确保 Launchpad (Ctrl+E) 已开启。`);
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        messages: [
+          { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
     });
-  } else {
-    try {
-      response = await fetch(url, options);
-    } catch (err) {
-      throw new Error(`API 直接请求失败: ${err.message}`);
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("API 直连超时 (15s)，请检查网络状况");
     }
+    throw new Error(`API 直连失败: ${error.message}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
@@ -287,14 +231,14 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
   
   if (!content) {
     console.error("[PromptEnhance] API 返回格式不正确:", data);
-    throw new Error("无法从 API 获取优化结果，请确认模型设置是否正确");
+    throw new Error("无法从 API 获取优化结果，请确认模型与 API Key 设置是否正确");
   }
   
   return content;
 }
 
 /**
- * 调用 Anthropic Claude API
+ * 调用 Anthropic Claude API (原生直连)
  */
 async function callAnthropicAPI(prompt, contextPrefix = "") {
   const userMessage = contextPrefix 
@@ -302,38 +246,39 @@ async function callAnthropicAPI(prompt, contextPrefix = "") {
     : prompt.trim();
 
   const url = `${config.apiBase}/messages`;
-  const options = {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: 2048,
-      system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
-    }),
-  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   let response;
   try {
-    response = await fetch(url, options);
-  } catch (err) {
-    if (err.message.includes('fetch') || err.name === 'TypeError') {
-      console.warn("[PromptEnhance] Local fetch failed, trying proxy via Launchpad...");
-      response = await broadcastFetch(url, options).catch(proxyErr => {
-        throw new Error(`Anthropic API 请求失败: ${err.message}. 请确保 Launchpad 已打开 (Ctrl+E)。`);
-      });
-    } else {
-      throw err;
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": config.apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: 2048,
+        system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Anthropic API 直连超时 (15s)，请检查网络状况");
     }
+    throw new Error(`Anthropic API 直连失败: ${error.message}`);
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error?.message || `Anthropic API 请求失败: ${response.status}`);
+    throw new Error(errorData.error?.message || `Anthropic API 响应错误: ${response.status}`);
   }
 
   const data = await response.json();
@@ -363,45 +308,110 @@ function findActiveInput() {
 
 function getInputValue(input) {
   if (!input) return "";
-  return input.contentEditable === "true" ? (input.innerText || "") : (input.value || "");
+  const raw = input.contentEditable === "true" 
+    ? (input.innerText || input.textContent || "") 
+    : (input.value || "");
+  return raw.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
 }
 
+/**
+ * 强力物理清空 contenteditable 输入框内的所有文本与 DOM 节点
+ * 严格遵循 Selection/Range API 规范，禁止使用 innerText = ""
+ */
+function clearContenteditableInput(input) {
+  try {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(input);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand("delete", false, null);
+  } catch (e) {
+    console.warn("[PromptEnhance] clear via delete failed:", e);
+  }
+
+  if (getInputValue(input).length > 0) {
+    try {
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(input);
+      range.deleteContents();
+      selection.removeAllRanges();
+    } catch (e) {
+      console.warn("[PromptEnhance] range.deleteContents failed:", e);
+    }
+  }
+}
+
+/**
+ * 安全且强制覆盖地设置输入框内容，确保原始文本被完全替换而非拼接追加
+ * @param {HTMLElement} input 
+ * @param {string} value 
+ * @returns {Promise<boolean>} 是否成功填充
+ */
 async function setInputValue(input, value) {
   if (!input) return false;
-  input.focus();
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const normalizedValue = value.trim();
 
-  // 绝技：针对 React/Monaco 的终极事件链注入方案
   try {
+    input.focus();
+    await sleep(30);
+
     if (input.contentEditable === "true") {
-      // 1. 强制选中该输入框的全部子节点内容 (放弃不可靠的 selectAll)
       const selection = window.getSelection();
       const range = document.createRange();
+
+      // 1. 强制物理清空原始文本，防止选区在 focus 时坍塌导致追加拼接
+      clearContenteditableInput(input);
+
+      // 2. 重新全选空容器并执行 insertText 写入新文本
       range.selectNodeContents(input);
       selection.removeAllRanges();
       selection.addRange(range);
 
-      // 2. 插入文本 (覆盖当前的 Selection)
-      const success = document.execCommand("insertText", false, value);
-      
-      // 如果 insertText 在某些环境下失败或导致换行丢失，尝试使用 ClipboardEvent(paste)
-      if (!success || getInputValue(input).trim() !== normalizedValue) {
-        console.warn("[PromptEnhance] insertText failed/mismatched, trying Clipboard Paste Event");
-        
-        // 再次确保处于全选状态，防止刚刚的失败导致光标塌陷
-        range.selectNodeContents(input);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        const dataTransfer = new DataTransfer();
-        dataTransfer.setData("text/plain", value);
-        input.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dataTransfer, bubbles: true, cancelable: true }));
+      document.execCommand("insertText", false, value);
+      await sleep(50);
+
+      let currentVal = getInputValue(input);
+      if (currentVal === normalizedValue) {
         input.dispatchEvent(new Event("input", { bubbles: true }));
+        return true;
       }
+
+      // 3. 校验未通过，尝试 Clipboard Paste 事件降级
+      console.warn("[PromptEnhance] insertText mismatch, attempting Paste fallback...");
+      clearContenteditableInput(input);
+
+      range.selectNodeContents(input);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      const dataTransfer = new DataTransfer();
+      dataTransfer.setData("text/plain", value);
+      input.dispatchEvent(new ClipboardEvent("paste", {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      }));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+
+      await sleep(100);
+      currentVal = getInputValue(input);
+      if (currentVal === normalizedValue) {
+        return true;
+      }
+
+      // 4. 若最终依旧不匹配（例如发生脏文本追加），彻底清空污染内容，防止在输入框保留重复拼接
+      console.warn("[PromptEnhance] Fallback mismatch. Wiping dirty content to prevent duplicates.");
+      clearContenteditableInput(input);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      return false;
+
     } else {
-      // 对于 textarea，如果有 React 绑定的 value setter，必须调用原生 setter
+      // 普通 textarea 原生 setter 注入
+      input.value = "";
       const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
         window.HTMLTextAreaElement.prototype,
         "value"
@@ -409,24 +419,18 @@ async function setInputValue(input, value) {
         window.HTMLInputElement.prototype,
         "value"
       )?.set;
-      
+
       if (nativeInputValueSetter) {
         nativeInputValueSetter.call(input, value);
       } else {
         input.value = value;
       }
       input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+
+      await sleep(50);
+      return getInputValue(input) === normalizedValue;
     }
-
-    await sleep(200);
-
-    // 双重校验：如果不匹配，说明修改未被有效接收
-    const endValue = getInputValue(input).trim();
-    if (endValue === normalizedValue) return true;
-    
-    // 如果走到这里依然失败，判定失败交由降级剪贴板处理
-    return false; // 无论如何不骗用户成功，老实回退到写入剪贴板
-
   } catch (e) {
     console.error("[PromptEnhance] DOM set error:", e);
     return false;

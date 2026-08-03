@@ -168,6 +168,9 @@ pub fn install_patch(
         restore_manager_files(&workbench_dir)?;
     }
 
+    let proxy_enabled = features.prompt_enhance.enabled || manager_features.prompt_enhance.enabled;
+    sync_launchpad_proxy(&workbench_dir, proxy_enabled)?;
+
     // 最后注入 cascade 到 workbench.html（必须在 manager 覆盖之后）
     if features.enabled {
         let workbench_html = workbench_dir.join("workbench.html");
@@ -427,6 +430,67 @@ fn inject_cascade_into_html(html_path: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
+const LAUNCHPAD_PROXY_MARKER_START: &str =
+    "<!-- [Antigravity-Power-Pro] Launchpad Proxy -->";
+const LAUNCHPAD_PROXY_MARKER_END: &str =
+    "<!-- [Antigravity-Power-Pro] Launchpad Proxy End -->";
+const LAUNCHPAD_PROXY_SCRIPT: &str =
+    "<script src=\"./shared/launchpad-proxy.js\" type=\"module\"></script>";
+
+fn remove_launchpad_proxy_block(content: &str) -> String {
+    let mut cleaned = content.to_string();
+    loop {
+        let Some(start) = cleaned.find(LAUNCHPAD_PROXY_MARKER_START) else {
+            break;
+        };
+        let end = if let Some(end_offset) =
+            cleaned[start..].find(LAUNCHPAD_PROXY_MARKER_END)
+        {
+            start + end_offset + LAUNCHPAD_PROXY_MARKER_END.len()
+        } else if let Some(script_offset) = cleaned[start..].find(LAUNCHPAD_PROXY_SCRIPT) {
+            start + script_offset + LAUNCHPAD_PROXY_SCRIPT.len()
+        } else {
+            break;
+        };
+        let mut end = end;
+        if cleaned[end..].starts_with("\r\n") {
+            end += 2;
+        } else if cleaned[end..].starts_with('\n') {
+            end += 1;
+        }
+        cleaned = format!("{}{}", &cleaned[..start], &cleaned[end..]);
+    }
+    cleaned
+}
+
+fn sync_launchpad_proxy_content(content: &str, enabled: bool) -> Result<String, String> {
+    let cleaned = remove_launchpad_proxy_block(content);
+    if !enabled {
+        return Ok(cleaned);
+    }
+
+    let block = format!(
+        "{}\n{}\n{}\n",
+        LAUNCHPAD_PROXY_MARKER_START, LAUNCHPAD_PROXY_SCRIPT, LAUNCHPAD_PROXY_MARKER_END
+    );
+    let lower = cleaned.to_ascii_lowercase();
+    let Some(head_end) = lower.find("</head>") else {
+        return Err("Launchpad 页面缺少 </head>，无法注入代理".to_string());
+    };
+    Ok(format!(
+        "{}{}{}",
+        &cleaned[..head_end], block, &cleaned[head_end..]
+    ))
+}
+
+fn sync_launchpad_proxy(workbench_dir: &PathBuf, enabled: bool) -> Result<(), String> {
+    let html_path = workbench_dir.join("workbench-jetski-agent.html");
+    let content = fs::read_to_string(&html_path)
+        .map_err(|e| format!("读取 Launchpad 页面失败: {}", e))?;
+    let updated = sync_launchpad_proxy_content(&content, enabled)?;
+    fs::write(&html_path, updated).map_err(|e| format!("写入 Launchpad 代理失败: {}", e))
+}
+
 /// 写入侧边栏补丁文件（extensions 目录 + workbench 目录双路径注入）
 fn write_cascade_patches(extensions_dir: &PathBuf, workbench_dir: &PathBuf, features: &FeatureConfig) -> Result<(), String> {
     let cascade_panel_dir = extensions_dir.join("cascade-panel");
@@ -648,6 +712,10 @@ fn restore_manager_files(workbench_dir: &PathBuf) -> Result<(), String> {
     if manager_dir.exists() {
         fs::remove_dir_all(&manager_dir)
             .map_err(|e| format!("删除 manager-panel 目录失败: {}", e))?;
+    }
+
+    if jetski_agent.exists() {
+        sync_launchpad_proxy(workbench_dir, false)?;
     }
 
     Ok(())
@@ -941,4 +1009,50 @@ fn clear_product_checksums(product_json_path: &PathBuf) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod launchpad_proxy_tests {
+    use super::sync_launchpad_proxy_content;
+
+    #[test]
+    fn injects_launchpad_proxy_once() {
+        let html = "<html><head></head><body><div>keep</div></body></html>";
+
+        let injected = sync_launchpad_proxy_content(html, true).unwrap();
+        let reinjected = sync_launchpad_proxy_content(&injected, true).unwrap();
+
+        assert_eq!(injected, reinjected);
+        assert_eq!(injected.matches("./shared/launchpad-proxy.js").count(), 1);
+    }
+
+    #[test]
+    fn disabling_removes_only_the_owned_proxy_block() {
+        let html = "<html><head><meta charset=\"utf-8\"></head><body><div>keep</div></body></html>";
+        let injected = sync_launchpad_proxy_content(html, true).unwrap();
+
+        let restored = sync_launchpad_proxy_content(&injected, false).unwrap();
+
+        assert_eq!(restored, html);
+        assert!(restored.contains("<div>keep</div>"));
+    }
+
+    #[test]
+    fn handles_case_insensitive_head_and_removes_duplicate_blocks() {
+        let html = "<html><HEAD></HEAD><body>keep</body></html>";
+        let injected = sync_launchpad_proxy_content(html, true).unwrap();
+        let duplicate_block = "<!-- [Antigravity-Power-Pro] Launchpad Proxy -->\n<script src=\"./shared/launchpad-proxy.js\" type=\"module\"></script>\n<!-- [Antigravity-Power-Pro] Launchpad Proxy End -->";
+        let duplicated = injected.replacen("</HEAD>", &format!("{}\n</HEAD>", duplicate_block), 1);
+
+        let restored = sync_launchpad_proxy_content(&duplicated, false).unwrap();
+
+        assert_eq!(restored, "<html><HEAD></HEAD><body>keep</body></html>");
+    }
+
+    #[test]
+    fn rejects_enabled_injection_without_head() {
+        let result = sync_launchpad_proxy_content("<html><body>keep</body></html>", true);
+
+        assert!(result.is_err());
+    }
 }
