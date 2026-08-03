@@ -4,7 +4,7 @@
  * 支持 OpenAI 兼容格式和 Anthropic Claude 格式
  * 
  * 功能特性:
- * - 直连 API 极速响应，无需中转代理
+ * - 极速直连 API Engine (Node.js https / Fetch / XHR 三重防护，穿透 CORS)
  * - 自动收集 IDE 上下文信息
  * - 物理擦除并替换输入框内容
  * - 简洁的 toast 提示
@@ -153,6 +153,122 @@ function buildContextPrefix() {
 }
 
 // ============================================
+// 三重驱动直连网络引擎 (Node https + Fetch + XHR)
+// ============================================
+
+/**
+ * 极速直连网络请求引擎 (Triple-Engine HTTP Client)
+ * 优先使用 Electron/Node 原生 https 模块 (彻底避开浏览器 CORS/CSP 跨域限制)
+ * 降级使用 Standard fetch
+ * 兜底使用 XMLHttpRequest
+ */
+async function directHttpRequest({ url, method = "POST", headers = {}, body = "", timeoutMs = 15000 }) {
+  // 1. 优先尝试 Node.js 原生 https/http 模块 (绕过 CORS 跨域)
+  try {
+    const getRequire = () => {
+      if (typeof window !== "undefined" && typeof window.require === "function") return window.require;
+      if (typeof globalThis !== "undefined" && typeof globalThis.require === "function") return globalThis.require;
+      return null;
+    };
+    const reqFn = getRequire();
+    if (reqFn) {
+      const https = reqFn("https");
+      const http = reqFn("http");
+      const urlModule = reqFn("url");
+
+      if (https && http && urlModule) {
+        const parsedUrl = new urlModule.URL(url);
+        const transport = parsedUrl.protocol === "https:" ? https : http;
+
+        return await new Promise((resolve, reject) => {
+          const bodyBuf = Buffer.from(body, "utf-8");
+          const reqOptions = {
+            hostname: parsedUrl.hostname,
+            port: parsedUrl.port || (parsedUrl.protocol === "https:" ? 443 : 80),
+            path: parsedUrl.pathname + parsedUrl.search,
+            method: method,
+            headers: {
+              ...headers,
+              "Content-Length": bodyBuf.length,
+            },
+            timeout: timeoutMs,
+          };
+
+          const req = transport.request(reqOptions, (res) => {
+            let resData = "";
+            res.on("data", (chunk) => { resData += chunk; });
+            res.on("end", () => {
+              resolve({
+                ok: res.statusCode >= 200 && res.statusCode < 300,
+                status: res.statusCode,
+                json: async () => JSON.parse(resData || "{}"),
+                text: async () => resData,
+              });
+            });
+          });
+
+          req.on("error", (e) => reject(new Error(`Node Direct Request Fail: ${e.message}`)));
+          req.on("timeout", () => {
+            req.destroy();
+            reject(new Error(`API 直连超时 (${timeoutMs / 1000}s)`));
+          });
+
+          req.write(bodyBuf);
+          req.end();
+        });
+      }
+    }
+  } catch (nodeErr) {
+    console.warn("[PromptEnhance] Node native http client unavailable, falling back to Fetch:", nodeErr);
+  }
+
+  // 2. 使用 Fetch API
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers,
+      body,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (fetchErr) {
+    if (fetchErr.name === "AbortError") {
+      throw new Error(`API 直连超时 (${timeoutMs / 1000}s)，请检查网络状况`);
+    }
+
+    // 3. 如果 Fetch 发生 Failed to fetch (如 CORS 拦截)，尝试使用 XHR 降级
+    console.warn("[PromptEnhance] Fetch failed, attempting XHR fallback...", fetchErr);
+    try {
+      return await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open(method, url, true);
+        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+        xhr.timeout = timeoutMs;
+
+        xhr.onload = () => {
+          resolve({
+            ok: xhr.status >= 200 && xhr.status < 300,
+            status: xhr.status,
+            json: async () => JSON.parse(xhr.responseText || "{}"),
+            text: async () => xhr.responseText,
+          });
+        };
+        xhr.onerror = () => reject(new Error("CORS 跨域被拒或网络中断"));
+        xhr.ontimeout = () => reject(new Error(`XHR 请求超时 (${timeoutMs / 1000}s)`));
+        xhr.send(body);
+      });
+    } catch (xhrErr) {
+      throw new Error(`API 直连失败: ${fetchErr.message}。由于 Electron file:// 协议限制，若目标 API 未开放 Access-Control-Allow-Origin: *，请检查网络或使用兼容节点。`);
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ============================================
 // LLM 交互 (纯直连模式)
 // ============================================
 
@@ -181,7 +297,7 @@ export async function enhance(prompt) {
 }
 
 /**
- * 调用 OpenAI 兼容 API (原生直连)
+ * 调用 OpenAI 兼容 API (三重直连)
  */
 async function callOpenAIAPI(prompt, contextPrefix = "") {
   const userMessage = contextPrefix 
@@ -191,35 +307,25 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
   const baseUrl = config.apiBase.endsWith("/") ? config.apiBase.slice(0, -1) : config.apiBase;
   const url = `${baseUrl}/chat/completions`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const bodyStr = JSON.stringify({
+    model: config.model,
+    messages: [
+      { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.7,
+  });
 
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: config.model,
-        messages: [
-          { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
-          { role: "user", content: userMessage },
-        ],
-        temperature: 0.7,
-      }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("API 直连超时 (15s)，请检查网络状况");
-    }
-    throw new Error(`API 直连失败: ${error.message}`);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const response = await directHttpRequest({
+    url,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${config.apiKey}`,
+    },
+    body: bodyStr,
+    timeoutMs: 15000,
+  });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -238,7 +344,7 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
 }
 
 /**
- * 调用 Anthropic Claude API (原生直连)
+ * 调用 Anthropic Claude API (三重直连)
  */
 async function callAnthropicAPI(prompt, contextPrefix = "") {
   const userMessage = contextPrefix 
@@ -247,34 +353,24 @@ async function callAnthropicAPI(prompt, contextPrefix = "") {
 
   const url = `${config.apiBase}/messages`;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  const bodyStr = JSON.stringify({
+    model: config.model,
+    max_tokens: 2048,
+    system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userMessage }],
+  });
 
-  let response;
-  try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": config.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: config.model,
-        max_tokens: 2048,
-        system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userMessage }],
-      }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error.name === "AbortError") {
-      throw new Error("Anthropic API 直连超时 (15s)，请检查网络状况");
-    }
-    throw new Error(`Anthropic API 直连失败: ${error.message}`);
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const response = await directHttpRequest({
+    url,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": config.apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: bodyStr,
+    timeoutMs: 15000,
+  });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -496,7 +592,7 @@ async function performEnhance() {
     }
   } catch (error) {
     loadingToast.remove();
-    showToast(`✗ 失败: ${error.message}`, "error", 4000);
+    showToast(`✗ 失败: ${error.message}`, "error", 5000);
   }
 }
 
