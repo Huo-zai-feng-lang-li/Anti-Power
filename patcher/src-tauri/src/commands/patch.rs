@@ -156,13 +156,6 @@ pub fn install_patch(
         // 备份并安装 Manager 补丁
         backup_manager_files(&workbench_dir)?;
         write_manager_patches(&workbench_dir, &manager_features)?;
-        
-        // 清空 product.json 的 checksums 字段，消除"安装损坏"提示
-        let product_json_path = antigravity_path
-            .join("resources")
-            .join("app")
-            .join("product.json");
-        clear_product_checksums(&product_json_path)?;
     } else {
         // 禁用时还原 Manager 文件
         restore_manager_files(&workbench_dir)?;
@@ -178,6 +171,13 @@ pub fn install_patch(
             inject_cascade_into_html(&workbench_html)?;
         }
     }
+
+    // 任何写入 workbench / Launchpad 的安装路径都可能触发 Antigravity checksum 校验。
+    let product_json_path = antigravity_path
+        .join("resources")
+        .join("app")
+        .join("product.json");
+    clear_product_checksums(&product_json_path)?;
 
     Ok(())
 }
@@ -1028,7 +1028,17 @@ fn clear_product_checksums(product_json_path: &PathBuf) -> Result<(), String> {
 
 #[cfg(test)]
 mod launchpad_proxy_tests {
-    use super::sync_launchpad_proxy_content;
+    use super::{install_patch, sync_launchpad_proxy_content, FeatureConfig, ManagerFeatureConfig};
+    use serde_json::Value;
+    use std::{env, fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!("antigravity-power-pro-{name}-{stamp}"))
+    }
 
     #[test]
     fn injects_launchpad_proxy_once() {
@@ -1069,5 +1079,50 @@ mod launchpad_proxy_tests {
         let result = sync_launchpad_proxy_content("<html><body>keep</body></html>", true);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn cascade_only_install_clears_product_checksums() {
+        let root = unique_temp_dir("cascade-checksums");
+        let extensions_dir = root.join("resources/app/extensions/antigravity");
+        let workbench_dir = root.join("resources/app/out/vs/code/electron-browser/workbench");
+        fs::create_dir_all(&extensions_dir).unwrap();
+        fs::create_dir_all(&workbench_dir).unwrap();
+
+        fs::write(extensions_dir.join("cascade-panel.html"), "<html></html>").unwrap();
+        fs::write(
+            workbench_dir.join("workbench.html"),
+            "<html><head></head><body></body></html>",
+        )
+        .unwrap();
+        fs::write(
+            workbench_dir.join("workbench-jetski-agent.html"),
+            "<html><head></head><body></body></html>",
+        )
+        .unwrap();
+
+        let product_json = root.join("resources/app/product.json");
+        fs::write(
+            &product_json,
+            r#"{"name":"Antigravity","checksums":{"workbench.html":"stale"}}"#,
+        )
+        .unwrap();
+
+        let features = FeatureConfig::default();
+        let mut manager_features = ManagerFeatureConfig::default();
+        manager_features.enabled = false;
+
+        install_patch(
+            root.to_string_lossy().to_string(),
+            features,
+            manager_features,
+        )
+        .unwrap();
+
+        let product: Value =
+            serde_json::from_str(&fs::read_to_string(&product_json).unwrap()).unwrap();
+        assert_eq!(product["checksums"], serde_json::json!({}));
+
+        fs::remove_dir_all(root).unwrap();
     }
 }

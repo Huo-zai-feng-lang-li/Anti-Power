@@ -2,6 +2,22 @@
 
 本文件记录每个版本的 Bug 修复和关键备忘, 防止后续改代码时重复踩坑. 时间格式如 `2026-05-15 09:00:00`同步的是git 提交时间
 
+## v2.6.82 (2026-08-05 21:17:15)
+
+### Antigravity 损坏提示修复
+
+| 修复项 | 根因 | 影响范围 |
+|--------|------|----------|
+| **只启用 Cascade 时仍提示 Antigravity 安装似乎损坏** | `install_patch()` 只在 Manager 启用分支清空 `product.json.checksums`，但 Cascade 注入同样会修改 `workbench.html` | `patcher/src-tauri/src/commands/patch.rs` |
+| **修复方案** | 安装流程结束前统一清空 `product.json.checksums`，覆盖 Cascade-only、Manager、Launchpad 代理写入路径 | Antigravity 安装补丁链路 |
+
+### 踩坑备忘
+
+- 只要写入 `workbench.html` 或 `workbench-jetski-agent.html`，就不能把 checksum 清理绑在某个 UI 分支上。
+- “损坏提示”不是补丁文件本身坏了，而是宿主 product 校验清单仍保留旧 hash。
+
+---
+
 ## v2.6.81 (2026-08-05 20:37:18)
 
 ### 提示词增强密钥隔离
