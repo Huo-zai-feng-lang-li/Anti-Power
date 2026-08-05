@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/version-v2.6.79-gold?style=flat-square" alt="版本">
+    <img src="https://img.shields.io/badge/version-v2.6.80-gold?style=flat-square" alt="版本">
 
   </a>
   <a href="https://codeium.com/antigravity">
@@ -93,6 +93,7 @@
 
 | 补丁版本    | 支持 IDE 版本      | 发布日期   | 重大更新内容                                                                                         |
 | :---------- | :----------------- | :--------- | :--------------------------------------------------------------------------------------------------- |
+| **v2.6.80** | v1.23.2 / Windsurf | 2026-08-05 | **修复**: 多行提示词 DOM 替换保持段落与缩进格式；规范文本不可见字符与换行符；优化上下文提取与 Token 限制 | ✅ 推荐 |
 | **v2.6.79** | v1.23.2 / Windsurf | 2026-08-03 | **修复**: 自动创建隐藏 Launchpad 桥接页；代理失败不再追加慢速 CORS 直连；按请求传递代理超时；限制增强输出长度 | ✅ 推荐 |
 | **v2.6.78** | v1.23.2 / Windsurf | 2026-08-03 | **修复**: 提示词增强请求桥接降延迟；防止重复点击并发；contenteditable 原子替换避免原文拼接；补充 Launchpad 与道家反代共存边界 | ✅ 推荐 |
 | **v2.6.72** | v1.23.2 / Windsurf | 2026-08-03 | **配置**: 默认提示词 API 升级至 TokenRhythm & deepseek-v4-flash；彻底修复自定义配置无法持久化保存退回默认值的 Bug | ✅ 推荐 |

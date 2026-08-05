@@ -1,130 +1,67 @@
----
-trigger: glob
-globs: *
----
+# Antigravity-Power-Pro 规则速记
 
-- **配置零覆盖原则**: 补丁更新时，禁止覆盖用户已有的 `config.json`。必须采用增量合并逻辑，确保用户的 `apiKey` 和自定义 API 路径在升级后依然有效。在 Rust 侧后端或 Vue 侧保存时也要分情况合并。
-- **版本全量同步**: 每次发布新 Tag 前，必须确保 6 处版本号完全一致。**操作指南**：手动修改 `patcher/package.json` 的 `version` 后，必须运行 `npm run --prefix patcher sync-version` 自动对齐其余 5 处 (`tauri.conf.json`、`Cargo.toml`、`App.vue`、`README.md`、`README_EN.md`)。
-- **发布审计**: 打 Tag 必须包含 `git push origin --tags` 等全链路声明，遵照 `/tag` 工作流要求。
+> 目标：让后续修改的人一眼看到项目边界、易错点和必测项。
 
-> 目标: 让 AI 一眼理解本项目在做什么, 补丁如何落地, 关键入口在哪里。
+## 1. 项目边界
 
-## 项目定位
+- `patcher/patches/`：运行时补丁源码，改 UI / 注入 / 写回逻辑都优先看这里。
+- `patcher/src-tauri/`：安装、检测、备份、写盘、版本同步。
+- `patcher/src/`：安装器前端 UI。
+- `.agent/`：跨会话规则和待办。
 
-- Antigravity-Power-Pro 是 AI 本地 IDE（如 Antigravity IDE Cascade 原型版本和 Windsurf IDE） 的全能挂载增强补丁。
-- Antigravity：改造 Cascade 面板和 Manager 面板，当前聚焦滚动到底部、提示词增强、字体大小可选调节三条链路。
-- 当前默认只开启滚动到底部和提示词增强；字体大小调节允许保留，但必须默认关闭。
-- Windsurf：改造其独立客户端（包括字体调节、增强悬浮模块、提示词等）。
-- 前端安装器使用了 Vue 提供的 Tab 布局进行环境切换（隔离状态）。
+## 2. 最容易写错的地方
 
-## 补丁落地流程 (核心链路)
+- **提示词增强的测试连接**在安装器链路里：
+  - 前端：`patcher/src/components/PromptEnhanceCard.vue`
+  - 后端：`patcher/src-tauri/src/commands/prompt.rs`
+  - 这里只传当前表单里的 `provider`、`apiBase`、`apiKey`、`model`。
+  - 不要误改 `patcher/patches/shared/enhance.js`，它只管 IDE 内真实增强。
 
-1. 桌面安装器位于 `patcher/` (Tauri + Vue)。
-2. Rust 后端由 `patcher/src-tauri/src/commands/*.rs` 负责：检测各自 IDE 路径、拉取默认配置与本地磁盘比对（执行白名单功能开关控制）。
-3. 安装具体流程：
-   - IDE 核心入口 `XXXX.html` 被 `app/out/...` 等路径下的 HTML 入口引用，安装时会被备份为 `.bak`，再原封不动写入增强补丁 `<script type="module" src="..."></script>`。
-   - 补丁目录结构按 IDE 面板强隔离：`cascade-panel/`、`manager-panel/`、`windsurf-panel/`，配置互相不干扰（写入各自领域的 `config.json`）。
-4. 本地补丁源代码置于 `patcher/patches/`，Rust 于编译时使用 `build.rs` 自动索引并打包至嵌入单体（除开 `.embed-exclude.txt` 排列项）。
+- **共享模块职责要分开**：
+  - `shared/enhance.js`：提示词业务、system prompt、回填、toast。
+  - `shared/request-engine.js`：请求编排、桥接探测、超时分流。
+  - `shared/launchpad-proxy.js`：BroadcastChannel 代理。
 
-## 关键目录 (优先修改落点)
+- **回填 contenteditable 时不要偷懒**：
+  - `setInputValue()` 必须先清空旧 `Selection/Range`。
+  - `replaceContenteditableDom()` 要做原子替换，再触发 `input/change`。
+  - 最后用 `getInputValue()` 校验。
+  - 禁止回退到 `innerText = ""`、`insertHTML`、只在末尾追加文本。
+  - 现在的 `replaceContenteditableDom()` 会按行写入并保留 `pre-wrap`，要保留换行/缩进就继续改这里，不要散到调用方。
 
-- `patcher/patches/`: 全部补丁原始文件（HTML / JS / CSS），是前端视觉与注入的灵魂心脏。
-- `patcher/src-tauri/`: 安装引擎逻辑。所有路径嗅探和备份重构。
-- `patcher/src/`: 安装工具 UI 层，配置功能开关、检查各依赖可用性与系统同步。
-- `.agent/`: AI Agent 自定义准则、工作流程的约束核心与知识挂载。
+- **跨域/代理边界**：
+  - `file://` 页面没有浏览器端跨域绕过能力。
+  - 在线 Launchpad 桥接可用就走代理；不可用时才走直连。
+  - 不要靠改请求头“伪造修复” CORS。
+  - 只要 `apiBase` 明确指向 `http://127.0.0.1:8937` 这类本地端口，就要按道家本地反代链路理解延迟和返回结果。
 
-## 安装器 API 连接测试
+- **写入和按钮都要保留隔离**：
+  - Cascade / Manager 两边的扫描和按钮逻辑不要混。
+  - Manager 里重渲染后要重新找当前输入框，不能只记旧节点。
+  - Tailwind DOM 只能用特征无关的滚动容器识别，不要塞语义类名。
 
-- 提示词增强的“测试连接”属于安装器链路，不属于 IDE 运行时补丁链路。
-- 前端入口: `patcher/src/components/PromptEnhanceCard.vue`，点击测试时必须把当前表单里的 `provider`、`apiBase`、`apiKey`、`model` 原样传给 Tauri 命令。
-- 后端入口: `patcher/src-tauri/src/commands/prompt.rs` 的 `test_prompt_connection`。该命令使用当前传入的 API 配置发起真实请求；只允许硬编码最小测试 prompt（当前为 `"Hi"`）和 `max_tokens`，禁止硬编码 API 地址、API Key 或模型。
-- OpenAI 兼容接口走 `{apiBase}/chat/completions`；Anthropic 走 `{apiBase}/v1/messages`。
-- 修连接测试时优先修改安装器前后端，不要误改 `shared/enhance.js`；`shared/enhance.js` 只负责 IDE 内实际提示词增强。
+- **生成长度不要放飞**：
+  - 现在 `shared/enhance.js` 里 OpenAI `max_tokens=512`，Anthropic `max_tokens=768`。
+  - 改这里就是在改响应时延和输出长度，不要忘记同步体验。
 
-## IDE 内部 Hook 锚标与漏洞机制
+- **配置和版本不要覆写**：
+  - `config.json` 只能增量合并，别把用户的 `apiKey` 和自定义 `apiBase` 冲掉。
+  - 改版本只改 `patcher/package.json`，然后跑 `npm run --prefix patcher sync-version` 对齐其余 5 处。
 
-### Antigravity
-- 侧翼环境: `resources/app/extensions/antigravity/cascade-panel.html`
-- 会话中枢 (Manager): `resources/app/out/vs/code/electron-browser/workbench/workbench-jetski-agent.html`
+## 3. 改动前后必须看的验证
 
-### Windsurf
-- 聚合门户: `resources/app/out/vs/code/electron-browser/workbench/workbench.html`
-- 挂载须知: 替换修改该文件将不可避免地招致 “程序防篡改校验（安装似乎损坏）”，所以卸载功能被要求绝对退回 `.bak` 文件。并且 Windsurf 设置了严防死守的 `require-trusted-types-for`，已透过 `default` Trusted Types 全局下推来豁免。
+- `shared/enhance.js`、`shared/request-engine.js`、`shared/launchpad-proxy.js`、`shared/input-replacer.js` 改完后：
+  - `node --test patcher/tests/launchpad-proxy.test.js patcher/tests/input-replacer.test.js`
+  - `npm run build --prefix patcher`
 
-### DOM 选择器红线
+- 要交付安装包时：
+  - `npm run tauri:build --prefix patcher`
 
-> **两个 IDE 页面均使用 Tailwind 工具类，严禁在补丁中硬编码依赖语义化类名 (如 `.chat-container`、`.agent-view-container`)。**
+- 改配置保存或版本号时：
+  - 检查 `patcher/package.json`、`tauri.conf.json`、`Cargo.toml`、`App.vue`、`README.md`、`README_EN.md` 是否同步。
 
-| 环境 | CSS 类名体系 | 可用锚点 | 滚动容器识别策略 |
-|------|-------------|----------|-----------------|
-| **cascade-panel** (侧边栏) | Tailwind 工具类 (`.overflow-y-auto`, `.overflow-auto`) | `.antigravity-agent-side-panel` (补丁自注入) | 按 `.overflow-y-auto` + `scrollHeight` 降序取最大 |
-| **manager-panel** (Manager) | 纯 Tailwind 工具类 (`scrollbar-hide`, `overflow-y-auto`)，**无任何语义锚点** | `document.body` (独占页面) | 按 `getComputedStyle(el).overflowY` + `scrollHeight` 取最大，并保留 `clientWidth >= 350` 的窄栏过滤 |
+## 4. 一句话原则
 
-- **禁止**: 在 `findRoot()` 或 `findScrollEl()` 中使用 `.chat-container`、`.conversation-container`、`.agent-view-container`、`.monaco-workbench` 等 IDE 原生语义类名作为必要条件判断
-- **必须**: 使用特征无关策略 — 遍历 DOM 按 `overflowY` + `scrollHeight` 取最大可滚动元素
-- **Manager 防误触**: Manager 页面存在文件列表、工具区、按钮组等同层 DOM。提示词按钮定位必须绑定“当前输入框邻近容器”，禁止用全局第一个 send/mic/submit 按钮作为兜底挂载点；滚动容器识别必须保留窄栏过滤，避免长列表抢占滚动焦点。
-
-### 补丁文件修改地图 (双面板 × 双功能)
-
-> **修改任何功能前，必须先查此表确认涉及哪些文件，两个面板各自独立、禁止交叉引用。**
-
-#### 源码 → IDE 部署路径
-
-| 源码目录 (patcher/patches/) | 部署位置 (IDE 内) |
-|---------------------------|------------------|
-| `cascade-panel/*` | `D:/Antigravity/resources/app/extensions/antigravity/cascade-panel/` |
-| `manager-panel/*` | `D:/Antigravity/resources/app/out/vs/code/electron-browser/workbench/manager-panel/` |
-| `shared/enhance.js` | 两处均部署：`extensions/antigravity/shared/` 和 `workbench/shared/` |
-
-#### 功能模块对照表
-
-| 功能 | cascade-panel (侧边栏) | manager-panel (Manager) | 共享模块 |
-|------|----------------------|------------------------|---------|
-| **滚动到底部** | `cascade-panel/scroll-to-bottom.js`<br>BTN_ID=`cascade-scroll-bottom-btn` | `manager-panel/scroll-to-bottom.js`<br>BTN_ID=`manager-scroll-bottom-btn` | 无 (各自独立) |
-| **提示词增强** | `cascade-panel/scan.js` 内 enhance 调用区 | `manager-panel/scan.js` 内 enhance 调用区 | `shared/enhance.js` |
-| **字体大小** | `cascade-panel/cascade-panel.js` + `cascade-panel/cascade-panel.css`，默认关闭 | `manager-panel/manager-panel.js` + `manager-panel/manager-panel.css`，默认关闭 | 无 |
-| **入口加载** | `cascade-panel/cascade-panel.js` | `manager-panel/manager-panel.js` | 无 |
-| **样式** | `cascade-panel/cascade-panel.css` | `manager-panel/manager-panel.css` | 无 |
-| **配置** | `cascade-panel/config.json` | `manager-panel/config.json` | 无 |
-
-#### 修改注意事项
-
-1. **scroll-to-bottom.js 是两份独立文件**，不共享代码。修改一个面板时必须检查另一个是否需要同步
-2. **enhance.js 是共享模块**，两个面板的 `scan.js` 通过 `import('../shared/enhance.js')` 引用。修改 enhance.js 会同时影响两个面板
-3. **BTN_ID 严格隔离**：cascade 用 `cascade-scroll-bottom-btn`，manager 用 `manager-scroll-bottom-btn`，禁止混用
-4. **findRoot 策略不同**：cascade 用 `.antigravity-agent-side-panel || document.body`，manager 直接用 `document.body`
-5. **部署需重新安装**：源码修改后必须重新构建 exe 并执行安装，才能更新 IDE 内的部署文件
-
-## 设计规范 (视觉与环境控制)
-
-- **设计语言**: 统一使用 "Obsidian Gold" (黑金拟物极客) 风格。功能悬浮按键统一为 **Circular 圆形**，配搭金耀色晕投影 (`rgba(251, 191, 36, 0.4)`)。
-- **UI 同步化**: 当你在某一环境例如 `cascade-panel` 修改了外观，**必须联动核准并更新**在 `manager-panel` 和 `windsurf-panel` 中的同级类视图。
-- **暗层穿透 (Shadow DOM)**: 对于 IDE 阴影 DOM 层深藏的结构（输入框文本），必须用特制的深穿透查询脚本（如 `querySelectorAllDeep`）去提取，切勿简单地相信标准的 `.querySelector`。
-
-## 终极架构防护红线
-
-- **虚拟 DOM 劫持准则**: 对框架富文本区施行暴力植入时，**严禁使用 `innerText = ""` 发号施令清理，也严禁依赖浏览器封装的 `execCommand("selectAll")`，更禁止用 `insertHTML` 注入 LLM 返回内容**。这类弱手段会触发光标坍塌、追加 Bug、HTML 转义/清洗差异和潜在注入风险。必须采用 Selection/Range API 对容器内全体子节点划取：`range.selectNodeContents(input)` 配合 `selection.addRange` 包裹旧文本后，再触发 `execCommand("insertText")`；失败时用 `ClipboardEvent("paste")` + `text/plain` 降级，并用 `getInputValue(input).trim()` 校验是否写入成功。
-- **UI 状态闭环底线**: LLM 增强与各种大工作量任务派发时，不能允许“点击没反应用户干等”。如果在防守严密的特定环境实在打不穿（比如极少数怪异布局），必须提供安全回退方案并 **触发明显的剪贴板复制提示 (showResultModal) **，拒绝静默失败。
-- **空间焦点抢夺防护**: 向 Manager 类融合会话面板加插按钮或进行长列表追踪时（如滚动条吸底），禁绝贪婪匹配全体 root！这种行为会被窗口内同层文件列表等其他系统级长列表诱发劫夺，必须叠加专属 CSS 限定甚至施加超高 `10000` 权重，锁定专属领域挂载。
-- **环境主权隔离**: `manager-panel/scan.js` 扫描时必须规避并隔离已属于侧边栏 `cascade-panel` 的特有类容（如 `.antigravity-agent-side-panel` 元素），实现跨模块井水不犯河水。位置定点权必须交放给各面板自己管理。绝对定位容器必须加上 `overflow: visible !important` 的超高权柄，防止界面跳变被断层裁剪。
-- **遗留配置清洗**: App.vue 等设置界面的初始化里，若是探测到过去落后遗留的 API 地址或者淘汰默认值，应通过条件判定予以剔除和静默覆盖，不要给用户留下过时的包袱。
-
-## 提示词增强连接与输入替换防护 (v2.6.79+)
-
-- **连接链路分层**: `shared/enhance.js` 只负责提示词业务与直接 HTTP 引擎；`shared/request-engine.js` 负责请求编排；`shared/launchpad-proxy.js` 负责 Launchpad BroadcastChannel 桥接。修改其中一层时必须保留另外两层的职责边界。
-- **Launchpad 无界面依赖**: `workbench-jetski-agent.html` 和 `launchpad-bridge.html` 都可作为 `BroadcastChannel` 响应端。Cascade/Manager 先探测在线桥接；探测失败时自动创建隐藏 `launchpad-bridge.html`，用户无需手动打开 Launchpad 或 Manager 页面。
-- **代理超时红线**: 探测必须使用短超时（当前 120ms），实际代理请求使用调用方的请求超时；在线代理请求失败后直接返回原始代理错误，不得再追加一次慢 CORS 直连。
-- **CORS 事实边界**: `file://` 页面没有浏览器端跨域绕过能力。没有在线 Launchpad 桥接且 Electron 原生 `require` 不可用时，只有开放 CORS 的 API 能走浏览器直连；不要用修改请求头、关闭前端校验等方式伪造修复。
-- **富文本替换红线**: `setInputValue()` 必须先清空旧 Selection/Range，再用 `replaceContenteditableDom()` 原子替换 `contenteditable` 的全部子节点，触发 `input/change`，并用 `getInputValue()` 精确校验；禁止改回仅在末尾插入、`innerText = ""`、`insertHTML` 或无校验的异步粘贴。
-- **共享文件影响面**: `shared/enhance.js` 同时影响 Cascade 与 Manager，`shared/launchpad-proxy.js` 还影响安装器注入的 Launchpad 页面。每次改动至少运行 `node --test patcher/tests/launchpad-proxy.test.js patcher/tests/input-replacer.test.js`，并重新执行 `npm run build --prefix patcher`。
-- **重复点击红线**: 增强按钮必须使用 `createSingleFlight()`/禁用态保证同一输入框只有一个在途增强请求；禁止让两次点击并发写回同一个 contenteditable，否则响应先后顺序会制造拼接和覆盖竞态。
-- **生成长度红线**: 提示词增强请求必须设置有限 `max_tokens`（当前 OpenAI 768、Anthropic 1024），避免模型无界生成拖慢非流式写回。
-- **Manager 输入引用**: Manager 扫描器不能只闭包保存初始 DOM 节点；IDE 重渲染后要重新解析仍连接的输入框，再执行写回，并保持侧边栏隔离。
-- **Tauri 构建红线**: 交付给用户的补丁程序必须使用 `npm run tauri:build --prefix patcher` 生成；禁止把 `cargo build --release` 的裸二进制当安装器交付，它会回退到 `devUrl` 并出现 `localhost` 拒绝连接。NSIS 下载失败时，仍可使用已生成的 `patcher/src-tauri/target/release/Antigravity-Power-Pro.exe`，但必须明确说明未生成安装包。
-- **版本同步**: 修改版本只改 `patcher/package.json`，然后运行 `npm run --prefix patcher sync-version`，确认 `tauri.conf.json`、`Cargo.toml`、`App.vue`、`README.md`、`README_EN.md` 六处一致。
-
-## 与道家提示词反重力注入共存
-
-- `道家提示词反重力注入/plugins/dao-proxy-pro/extension.js` 属于 Extension Host 层：当前 Antigravity 运行证据显示它把语言服务器的 `--cloud_code_endpoint` 指向 `http://127.0.0.1:8937`，并提供本地反代；它没有操作 Cascade/Manager 的 contenteditable，也没有使用 `Antigravity_Fetch_Proxy` BroadcastChannel。
-- 因此它不是提示词增强按钮“原文拼接”的直接来源。拼接排查优先看 `setInputValue()`、输入框重渲染和重复点击并发；网络变慢排查优先看 API 端点、Launchpad 探测和上游响应。
-- 提示词增强若要独立走外部 OpenAI 兼容接口，应使用独立的 `https://.../v1`；只有明确把 `apiBase` 配成 `http://127.0.0.1:8937` 或其他道家本地端口时，才会进入道家反代的路由、系统提示词注入和渠道选择链路，结果与延迟也会受其影响。
+- 共享模块改动要先看影响面。
+- 回填问题优先查 `setInputValue()`，不要散修调用方。
+- 测试连接只改安装器链路，不碰运行时增强主链路。

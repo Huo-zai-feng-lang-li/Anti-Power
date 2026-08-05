@@ -13,6 +13,35 @@ const createFakeInput = (text) => ({
   },
 });
 
+const createFormattedFakeNode = (tagName) => ({
+  tagName,
+  style: {},
+  childNodes: [],
+  appendChild(node) {
+    this.childNodes.push(node);
+    return node;
+  },
+  set textContent(value) {
+    this.childNodes = [{ textContent: value }];
+  },
+  get textContent() {
+    return this.childNodes.map((node) => node.textContent).join("");
+  },
+});
+
+const createFormattedFakeInput = () => ({
+  childNodes: [],
+  replaceChildren(...nodes) {
+    this.childNodes = nodes;
+  },
+  get textContent() {
+    return this.childNodes.map((node) => node.textContent).join("");
+  },
+  get innerText() {
+    return this.childNodes.map((node) => node.textContent).join("\n");
+  },
+});
+
 test("replaces all existing contenteditable text instead of appending", () => {
   const input = createFakeInput("原始提示词");
   const documentRef = { createTextNode: (text) => ({ textContent: text }) };
@@ -22,6 +51,24 @@ test("replaces all existing contenteditable text instead of appending", () => {
   assert.equal(replaced, true);
   assert.equal(input.textContent, "优化后的提示词");
   assert.equal(input.childNodes.length, 1);
+});
+
+test("preserves multiline formatting when replacing contenteditable text", () => {
+  const input = createFormattedFakeInput();
+  const documentRef = {
+    createElement: (tagName) => createFormattedFakeNode(tagName),
+    createTextNode: (text) => ({ textContent: text }),
+  };
+
+  const replaced = replaceContenteditableDom(input, "第一行\n  第二行", documentRef);
+
+  assert.equal(replaced, true);
+  assert.equal(input.childNodes.length, 2);
+  assert.equal(input.childNodes[0].tagName, "div");
+  assert.equal(input.childNodes[0].style.whiteSpace, "pre-wrap");
+  assert.equal(input.childNodes[0].textContent, "第一行");
+  assert.equal(input.childNodes[1].textContent, "  第二行");
+  assert.equal(input.innerText, "第一行\n  第二行");
 });
 
 test("shares one in-flight enhancement when the button is clicked twice", async () => {

@@ -132,6 +132,9 @@ const CONVERSATION_SELECTORS = [
   "[class*=\"conversation\"]",
 ];
 
+const CONVERSATION_HISTORY_LIMIT = 3000;
+const SELECTION_LIMIT = 1200;
+
 const NOISE_SELECTORS = [
   ".model-selector-container",
   ".chat-input-container",
@@ -158,21 +161,21 @@ function buildContextPrefix() {
     NOISE_SELECTORS.forEach(s => {
       clone.querySelectorAll(s).forEach(n => n.remove());
     });
-    const historyText = clone.innerText.trim();
+    const historyText = clone.innerText.replace(/[\u200B-\u200D\uFEFF]/g, "");
     if (historyText) {
-      context += `对话历史:\n${historyText.substring(Math.max(0, historyText.length - 3000))}\n\n`;
+      context += `对话历史:\n${historyText.substring(Math.max(0, historyText.length - CONVERSATION_HISTORY_LIMIT))}\n\n`;
     }
   }
 
   // 2. 获取当前编辑文件名 (尝试从 Tab 获取)
   const activeTab = document.querySelector("[class*=\"tab-\"].active, .tab.selected");
   if (activeTab) {
-    context += `当前文件: ${activeTab.innerText.trim()}\n\n`;
+    context += `当前文件: ${activeTab.innerText.replace(/[\u200B-\u200D\uFEFF]/g, "")}\n\n`;
   }
 
   // 3. 获取选中的代码 (如果可能)
-  const selection = window.getSelection().toString().trim();
-  if (selection && selection.length < 2000) {
+  const selection = window.getSelection().toString().replace(/[\u200B-\u200D\uFEFF]/g, "");
+  if (selection && selection.length < SELECTION_LIMIT) {
     context += `选中代码:\n${selection}\n\n`;
   }
 
@@ -389,16 +392,17 @@ export async function enhance(prompt) {
  * 调用 OpenAI 兼容 API (三重直连)
  */
 async function callOpenAIAPI(prompt, contextPrefix = "") {
+  const promptText = normalizeEditorText(prompt);
   const userMessage = contextPrefix 
-    ? `上下文信息:\n${contextPrefix}\n用户原始提示词:\n${prompt.trim()}`
-    : prompt.trim();
+    ? `上下文信息:\n${contextPrefix}\n用户原始提示词:\n${promptText}`
+    : promptText;
 
   const baseUrl = config.apiBase.endsWith("/") ? config.apiBase.slice(0, -1) : config.apiBase;
   const url = `${baseUrl}/chat/completions`;
 
   const bodyStr = JSON.stringify({
     model: config.model,
-    max_tokens: 768,
+    max_tokens: 512,
     messages: [
       { role: "system", content: config.systemPrompt || DEFAULT_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
@@ -438,15 +442,16 @@ async function callOpenAIAPI(prompt, contextPrefix = "") {
  * 调用 Anthropic Claude API (三重直连)
  */
 async function callAnthropicAPI(prompt, contextPrefix = "") {
+  const promptText = normalizeEditorText(prompt);
   const userMessage = contextPrefix 
-    ? `上下文信息:\n${contextPrefix}\n用户原始提示词:\n${prompt.trim()}`
-    : prompt.trim();
+    ? `上下文信息:\n${contextPrefix}\n用户原始提示词:\n${promptText}`
+    : promptText;
 
   const url = `${config.apiBase}/messages`;
 
   const bodyStr = JSON.stringify({
     model: config.model,
-    max_tokens: 1024,
+    max_tokens: 768,
     system: config.systemPrompt || DEFAULT_SYSTEM_PROMPT,
     messages: [{ role: "user", content: userMessage }],
   });
@@ -494,12 +499,17 @@ function findActiveInput() {
     ? document.activeElement : null;
 }
 
-function getInputValue(input) {
+function normalizeEditorText(value, trim = false) {
+  const normalized = String(value ?? "").replace(/\r\n/g, "\n").replace(/[\u200B-\u200D\uFEFF]/g, "");
+  return trim ? normalized.trim() : normalized;
+}
+
+function getInputValue(input, { trim = false } = {}) {
   if (!input) return "";
   const raw = input.contentEditable === "true" 
     ? (input.innerText || input.textContent || "") 
     : (input.value || "");
-  return raw.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+  return normalizeEditorText(raw, trim);
 }
 
 /**
@@ -518,7 +528,7 @@ function clearContenteditableInput(input) {
     console.warn("[PromptEnhance] clear via delete failed:", e);
   }
 
-  if (getInputValue(input).length > 0) {
+  if (getInputValue(input, { trim: true }).length > 0) {
     try {
       const selection = window.getSelection();
       const range = document.createRange();
@@ -541,7 +551,7 @@ async function setInputValue(input, value) {
   if (!input) return false;
 
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  const normalizedValue = value.trim();
+  const normalizedValue = normalizeEditorText(value);
 
   try {
     input.focus();
@@ -676,7 +686,7 @@ async function performEnhance() {
     return;
   }
 
-  const originalPrompt = getInputValue(input).trim();
+  const originalPrompt = getInputValue(input, { trim: true });
   if (!originalPrompt) {
     showToast("请先输入提示词", "error");
     return;

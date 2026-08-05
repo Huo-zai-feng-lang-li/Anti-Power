@@ -2,6 +2,24 @@
 
 本文件记录每个版本的 Bug 修复和关键备忘, 防止后续改代码时重复踩坑. 时间格式如 `2026-05-15 09:00:00`同步的是git 提交时间
 
+## v2.6.80 (2026-08-05 19:30:00)
+
+### 提示词多行格式保持与文本清洗控制
+
+| 修复项 | 根因 | 影响范围 |
+|--------|------|----------|
+| **多行提示词替换后丢失换行与缩进** | `replaceContenteditableDom` 简单将文本作为单个 TextNode 注入，导致浏览器转换为单行连续文本 | `patcher/patches/shared/input-replacer.js` |
+| **编辑框与上下文中的文本不可见字符** | 各种 DOM 读取和事件输入可能带入不可见 Zero-width 字符及 `\r\n`，引发 API 编码异常或长度匹配偏差 | `patcher/patches/shared/enhance.js` |
+| **提示词增强 API Token 限制与结构保护** | 上下文拼接与单次输出限制需避免超过模型 Window 上限 | `patcher/patches/shared/enhance.js` |
+| **修复方案** | `input-replacer` 改为多行 `div` 节点拆分并设置 `whiteSpace: "pre-wrap"`；统一引入 `normalizeEditorText` 清洗不可见字符与标准换行；增加相关单元测试 | `input-replacer.js`、`enhance.js`、`input-replacer.test.js` |
+
+### 踩坑备忘
+
+- `contenteditable` 在虚拟 DOM 下处理多行替换时，必须将多行按 `\n` 切分为 `div` 子元素并带 `whiteSpace: "pre-wrap"` 样式，否则文本缩进和折行会被压平。
+- 从 DOM 提取文本或输入框读取 `innerText` 时，需统一去除零宽字符 (`\u200B-\u200D\uFEFF`)，防止隐藏控制符干扰正则匹配或字符长度计算。
+
+---
+
 ## v2.6.72 (2026-08-03 00:46:00)
 
 ### 提示词增强默认 API 升级与持久化闭环
