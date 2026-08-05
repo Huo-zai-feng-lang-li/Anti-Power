@@ -2,6 +2,23 @@
 
 本文件记录每个版本的 Bug 修复和关键备忘, 防止后续改代码时重复踩坑. 时间格式如 `2026-05-15 09:00:00`同步的是git 提交时间
 
+## v2.6.81 (2026-08-05 20:37:18)
+
+### 提示词增强密钥隔离
+
+| 修复项 | 根因 | 影响范围 |
+|--------|------|----------|
+| **真实提示词增强 Key 进入开源 tracked 文件** | 默认配置、补丁配置和联网测试脚本直接硬编码历史 API Key | `patcher/src/App.vue`、`patcher/patches/*`、`patcher/tests/direct-http.test.js` |
+| **缺少提交前 Secret 防线** | 仅靠人工检查，无法防止 `sk_tr_` / `fe_oa_` 类密钥再次入库 | `patcher/tests/no-committed-secrets.test.js`、本地 `pre-commit` hook |
+| **修复方案** | tracked 默认 key 置空；本机 key 改由忽略文件 `patcher/.env.local` 注入；新增 tracked secret 扫描测试 | 安装器默认配置、补丁默认配置、测试链路 |
+
+### 踩坑备忘
+
+- 公开源码只能保留空值或占位配置；真实 Key 只能来自本地未跟踪文件或 CI Secret。
+- 本机 `.env.local` 构建出的安装包会内嵌 Key，公开 release 必须使用无本地 Key 的干净环境构建。
+
+---
+
 ## v2.6.80 (2026-08-05 19:30:00)
 
 ### 提示词多行格式保持与文本清洗控制

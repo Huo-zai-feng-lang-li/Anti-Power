@@ -30,7 +30,7 @@ impl Default for PromptEnhanceConfig {
             enabled: true,
             provider: "openai".to_string(),
             api_base: "https://tokenrhythm.studio/v1".to_string(),
-            api_key: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0".to_string(),
+            api_key: String::new(),
             model: "deepseek-v4-flash".to_string(),
             system_prompt: DEFAULT_SYSTEM_PROMPT.to_string(),
         }

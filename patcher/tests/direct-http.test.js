@@ -3,6 +3,12 @@ import { URL } from "url";
 
 const url = "https://tokenrhythm.studio/v1/chat/completions";
 const parsedUrl = new URL(url);
+const apiKey = process.env.PROMPT_ENHANCE_API_KEY || process.env.VITE_PROMPT_ENHANCE_API_KEY;
+
+if (!apiKey) {
+  console.log("[Test] SKIP: set PROMPT_ENHANCE_API_KEY or VITE_PROMPT_ENHANCE_API_KEY to run live HTTP check.");
+  process.exit(0);
+}
 
 const body = JSON.stringify({
   model: "deepseek-v4-flash",
@@ -19,7 +25,7 @@ const reqOptions = {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": "Bearer sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    "Authorization": `Bearer ${apiKey}`,
     "Content-Length": Buffer.byteLength(body),
   },
   timeout: 10000,

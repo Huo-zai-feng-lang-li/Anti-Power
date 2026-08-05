@@ -13,11 +13,12 @@ import ManagerFeatureCard from "./components/ManagerFeatureCard.vue";
 import { getVersion } from "@tauri-apps/api/app";
 
 // 常量
-const APP_VERSION = ref("2.6.80");
+const APP_VERSION = ref("2.6.81");
 const GITHUB_URL = "https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro";
 // 每次更新 DEFAULT_SYSTEM_PROMPT 时递增此版本号，旧版 config 会自动重置
 const SYSTEM_PROMPT_VERSION = 2;
 const FEATURE_DEFAULTS_VERSION = 1;
+const LOCAL_PROMPT_ENHANCE_API_KEY = import.meta.env.VITE_PROMPT_ENHANCE_API_KEY || "";
 
 const DEFAULT_SYSTEM_PROMPT = `你是一个智能提示词优化器，专门帮助用户生成更有效的 AI 对话提示词。
 
@@ -87,9 +88,9 @@ const features = ref({
   promptEnhance: {
     enabled: true,
     provider: "openai",
-    apiBase: "https://api.freemodel.dev/v1",
-    apiKey: "fe_oa_d489e9161b01e3cb8954bf50c5a8cd80fdb4b25e5e8870f9",
-    model: "gpt-5.4-mini",
+    apiBase: "https://tokenrhythm.studio/v1",
+    apiKey: LOCAL_PROMPT_ENHANCE_API_KEY,
+    model: "deepseek-v4-flash",
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     systemPromptVersion: SYSTEM_PROMPT_VERSION,
   },
@@ -112,7 +113,7 @@ const windsurfFeatures = ref({
     enabled: true,
     provider: "openai",
     apiBase: "https://tokenrhythm.studio/v1",
-    apiKey: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    apiKey: LOCAL_PROMPT_ENHANCE_API_KEY,
     model: "deepseek-v4-flash",
     systemPrompt: "",
     systemPromptVersion: SYSTEM_PROMPT_VERSION,
@@ -136,7 +137,7 @@ const managerFeatures = ref({
     enabled: true,
     provider: "openai",
     apiBase: "https://tokenrhythm.studio/v1",
-    apiKey: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    apiKey: LOCAL_PROMPT_ENHANCE_API_KEY,
     model: "deepseek-v4-flash",
     systemPrompt: DEFAULT_SYSTEM_PROMPT,
     systemPromptVersion: SYSTEM_PROMPT_VERSION,

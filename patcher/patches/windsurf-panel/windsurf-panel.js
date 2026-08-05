@@ -33,7 +33,7 @@ const DEFAULT_CONFIG = {
     enabled: true,
     provider: "openai",
     apiBase: "https://tokenrhythm.studio/v1",
-    apiKey: "sk_tr_8a8uvItmEItosRIGXcGHhc49BuDqJrP8uQrhOeeyFA0",
+    apiKey: "",
     model: "deepseek-v4-flash",
     systemPrompt: "",
   },
