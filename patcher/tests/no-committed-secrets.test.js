@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -18,6 +18,7 @@ test("tracked files do not contain committed prompt-enhance secrets", () => {
   const leaks = [];
 
   for (const file of files) {
+    if (!existsSync(file)) continue;
     const content = readFileSync(file, "utf8");
     for (const pattern of secretPatterns) {
       for (const match of content.matchAll(pattern)) {

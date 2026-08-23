@@ -19,6 +19,14 @@
 
       <label class="feature-item" :class="{ 'item-disabled': !model.enabled }">
         <div class="feature-info">
+          <span class="feature-name">Mermaid 图表预览</span>
+          <p class="feature-desc">在 Cascade 面板自动将 Mermaid 代码块渲染为流程/时序图</p>
+        </div>
+        <input type="checkbox" v-model="model.mermaid" class="checkbox" :disabled="!model.enabled">
+      </label>
+
+      <label class="feature-item" :class="{ 'item-disabled': !model.enabled }">
+        <div class="feature-info">
           <span class="feature-name">侧边栏字体大小</span>
           <p class="feature-desc">调整 Cascade 面板整体字体大小</p>
         </div>
@@ -72,6 +80,7 @@
 export interface FeatureFlags {
   enabled: boolean;
   scrollToBottom: boolean;
+  mermaid: boolean;
   fontSizeEnabled: boolean;
   fontSize: number;
   sidePaddingLeft: number;

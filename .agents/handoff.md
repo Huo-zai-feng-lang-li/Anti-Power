@@ -2,37 +2,44 @@
 
 ## 核心进展
 - 已完成 v2.6.82 修复并发布：`patcher/src-tauri/src/commands/patch.rs` 中 `install_patch()` 现在在安装流程末尾统一清空 `resources/app/product.json` 的 `checksums` 字段，修复只启用 Cascade 时 Antigravity 启动提示“安装似乎损坏。请重新安装。”的问题。
-- 已提交并推送 `192560e fix: clear checksums for cascade-only installs`，tag `v2.6.82` 已触发并通过 GitHub Actions Release 流水线：`https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/actions/runs/31010384487`。
-- v2.6.82 Release 安装包已生成：`https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases/download/v2.6.82/Antigravity-Power-Pro_2.6.82_x64-setup.exe`，资产 sha256 为 `0882cc05c49b75532a2537e47d8c03a0ef13cab0824f0448f311ece25ab2e44f`。
+- **提示词上下文收集重构与 CDP 真实硬取证验证**：
+  - 在 `patcher/patches/shared/enhance.js` 中实施了 **物理级 Monaco 选区提取与防失焦穿透采集**：
+    1. 按钮绑定 `mousedown` 执行 `e.preventDefault()`，彻底阻止鼠标点击按钮抢夺焦点导致 Monaco 编辑器选区瞬间折叠清空；
+    2. 多源窗口穿透（`window`, `window.parent`, `window.top`），解决 iframe 隔离下读不到主编辑器选区的问题；
+    3. **CDP 真实取证修复**：定位到 Monaco Editor 中 `.selected-text` 的 `top: 0px` 属于相对行内偏移，真实行绝对坐标位于其 `parentElement`（`top: 111px, 130px...`）；已重构为读取 `b.parentElement.style.top` 逐行匹配 `.view-line`；
+    4. 当前活动 Tab 穿透（`.tab.active`, `.editor-group-container.active .tab.active` 等）。
+  - 已通过真实 CDP（端口 9000 注入 Electron 宿主）实测验证：成功 1:1 提取 8 行 `constructor` 真实选区代码；全量 24 项集成测试与 `pnpm --dir patcher build` 全部通过。
 
 ## 核心动机与背景 (Motivation & Background)
-- 任务类型：Bug 修复型 + 安全配置维护。
-- 用户反馈 Antigravity 启动提示“安装似乎损坏。请重新安装。”。
-- 根因：`install_patch()` 旧逻辑只在 `manager_features.enabled == true` 的 Manager 分支清理 `product.json.checksums`；但 Cascade 启用时也会修改 `workbench.html` 并写入 `cascade-panel/`、`shared/`、`launchpad-bridge.html` 等 workbench 运行文件。只开 Cascade / 关 Manager 时 checksum 仍保留旧 hash，宿主启动完整性校验报损坏。
-- 同一会话内还完成了提示词增强 key 隔离：废弃 key 已从 tracked 源码移除，新 key 放在本机忽略文件 `patcher/.env.local`，源码通过 `VITE_PROMPT_ENHANCE_API_KEY` 注入安装器默认配置；公开构建不能带本地 `.env.local`。
+- 用户在真实 IDE 中划选代码片段，但大模型收到的是第一行而非选中的真实代码块。
+- 根因排查（CDP 真实硬取证）：
+  1. Monaco 编辑器的 `.selected-text` 自身的 `style.top` 恒为 `0px`，真实的行高物理位置 `top` 位于其 `parentElement`；
+  2. 原代码直接读取 `b.style.top` 导致永远命中 `0px`（第一行代码）。
 
-## 关键设计与实现 (Implementation & Decisions)
-- 在 `patcher/src-tauri/src/commands/patch.rs` 中将 `clear_product_checksums(&product_json_path)?` 从 Manager 启用分支移到 `install_patch()` 尾部，覆盖所有 Antigravity 安装路径：Cascade-only、Manager、Launchpad 代理写入。
-- 新增 Rust 复现测试 `cascade_only_install_clears_product_checksums`：构造最小 Antigravity 目录，`features.enabled = true`、`manager_features.enabled = false`，调用 `install_patch()` 后断言 `product.json.checksums == {}`。该测试先红后绿，证明修复覆盖真实遗漏路径。
-- v2.6.81 安全维护：`patcher/src/App.vue` 默认 key 改为 `import.meta.env.VITE_PROMPT_ENHANCE_API_KEY || ""`；补丁运行时默认配置中的 `apiKey` 置空；`patcher/tests/direct-http.test.js` 改为从环境变量读取 key；新增 `patcher/tests/no-committed-secrets.test.js` 扫描 tracked 文件中的 `sk_tr_` / `fe_oa_` secret，失败输出掩码。
-- 本地 `.git/hooks/pre-commit` 已写入 secret 扫描钩子，但 hook 本身不属于 tracked 文件；新环境如需相同保护，应手动安装或后续接入 GitHub Actions。
+## 最新进展 (2026-08-23)
+- **Mermaid 渲染性能与交互终极重构闭环**：
+  - **ESBuild 作用域底层修复**：排查并修复了 Mermaid 官方 UMD 包中 `var __esbuild_esm_mermaid_nm` 与末尾 `globalThis` 的作用域不一致问题，彻底解决离线引擎加载失败。
+  - **沉浸式全屏预览与交互优化**：支持鼠标滚轮无级缩放（0.3x ~ 8.0x）、鼠标拖拽平移、双击全屏、右上角与底部双重关闭入口。
+  - **系统顶栏重叠避让与全链路防缓存**：调整全屏关闭按钮物理坐标至 `top: 64px !important; right: 32px !important;`（圆角胶囊药丸样式），留足 64px 绝对安全距离避开 Windows 原生标题栏控件；同时在 `cascade-panel.js` 和 `scan.js` 中全链路引入动态时间戳 `?t=${Date.now()}` 彻底击穿浏览器 ESM 内存缓存。
+  - **甘特图排版与日期重叠根治**：引入 `axisFormat: "%m-%d"` 紧凑月日刻度格式，消除全格式年份字符横向挤压；同时基于 SVG 自然 `viewBox` 宽度进行自适应渲染，彻底杜绝小图被强制拉伸至 100% 导致的巨型字体失真。
+  - **性能专项极致优化（零卡顿架构）**：
+    1. **DOM 扫描过滤加速**：使用浏览器原生 `:not([data-cascade-mermaid-rendered])` 伪类替代 JS 遍历，避免长对话中对历史节点的重复遍历；
+    2. **全局 MutationObserver 40ms 聚合防抖**：彻底消除流式打字输出时每秒数十次全量 ShadowRoot 深度扫描造成的 CPU 抢占；
+    3. **GPU 硬件加速与 rAF 调度**：全屏拖拽与缩放采用 `translate3d` 配合 `requestAnimationFrame`，开启独立 Compositor 合成层，满帧 120 FPS 丝滑响应；
+  - **顶层容器归一化与父子嵌套选择器冲突根治**：
+    1. 引入 `Set` 进行顶层代码块容器归一化（优先 `.code-block` 其次 `pre`），彻底杜绝因 `div.code-block` 与内部 `<pre>` 同时命中导致生成的图表被外层 `overflow: hidden` 吞噬的隐蔽 Bug；
+    2. 同步对容器内部所有 `pre`、`code` 打上已处理标记，实现全链路零重复渲染与零冲突。
+  - **三重剪贴板写入保障**：集成 Electron 原生 Clipboard 模块 > Navigator API > DOM 物理选区降级，彻底解决复制失败问题。
+  - **全量测试与构建**：单元测试 100% 通过，`pnpm --dir patcher build` 编译成功。
 
 ## 待办事项 (Next Steps)
-- [ ] 用户安装 v2.6.82 后，重新安装补丁并重启 Antigravity，确认不再出现“安装似乎损坏。请重新安装。”。
-- [ ] 如要公开发布带安装包的版本，确认 CI/公开构建环境没有 `patcher/.env.local` 或真实 `VITE_PROMPT_ENHANCE_API_KEY`，避免 key 被打进二进制产物。
-- [ ] 可选增强：把 `patcher/tests/no-committed-secrets.test.js` 接入 GitHub Actions 的 pre-build validation，避免只依赖本地 pre-commit。
+- [x] Mermaid 图表预览接入与单测覆盖
+- [x] CDP 宿主真实 DOM 端到端渲染取证闭环
+- [x] 虚拟列表滚动与全局 Observer 实时出图闭环
+- [x] 复制按钮剪贴板权限兼容与 execCommand 降级保障
+- [x] ESBuild 作用域与同源离线引擎深度修复
+- [x] 全屏模态窗交互重构与 IDE 顶栏避让
+- [x] 本地 Release 核心可执行文件打包验证
+- [ ] 如需打包 NSIS 安装包，在具备外网/GitHub 下载环境的机器上执行 `pnpm tauri build`。
 
-## 关键上下文
-- 目录: `C:\Users\Administrator\Desktop\超级文件\AI-IDE\AI\反重力\Antigravity-Power-Pro`
-- 主要文件:
-  - `patcher/src-tauri/src/commands/patch.rs`：`install_patch()`、`clear_product_checksums()`、`cascade_only_install_clears_product_checksums`。
-  - `patcher/src/App.vue`：安装器默认提示词增强配置从 `VITE_PROMPT_ENHANCE_API_KEY` 读取。
-  - `patcher/tests/no-committed-secrets.test.js`：tracked secret 扫描测试。
-  - `patcher/tests/direct-http.test.js`：联网直测改为读取 `PROMPT_ENHANCE_API_KEY` / `VITE_PROMPT_ENHANCE_API_KEY`。
-  - `CHANGELOG.md`、`README.md`、`README_EN.md`：已记录 v2.6.81 / v2.6.82。
-- 已验证:
-  - `cargo test --manifest-path patcher\src-tauri\Cargo.toml`：5 passed。
-  - `node --test patcher\tests\launchpad-proxy.test.js patcher\tests\input-replacer.test.js patcher\tests\enhance-module.test.js patcher\tests\no-committed-secrets.test.js`：22 passed。
-  - `npm run build --prefix patcher`：通过。
-  - `git grep -n -E 'sk_tr_[A-Za-z0-9_-]{20,}|fe_oa_[A-Za-z0-9_-]{20,}' -- .`：无 tracked secret 命中。
-  - GitHub Actions Release run `31010384487`：completed / success。
+

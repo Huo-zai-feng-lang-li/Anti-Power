@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/Version-v2.6.82-gold.svg?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/Version-v2.6.83-gold.svg?style=flat-square" alt="Version">
   </a>
   <a href="https://codeium.com/antigravity">
     <img src="https://img.shields.io/badge/Supports_Antigravity-v1.23.2-green.svg?style=flat-square" alt="Antigravity">
@@ -90,6 +90,7 @@ For manual installation, download the patch zip from Releases and refer to [manu
 
 | Patch Version | Supported Antigravity Version | Date       | Update Content                                                                     |
 | ------------- | ----------------------------- | ---------- | ---------------------------------------------------------------------------------- |
+| v2.6.83       | v1.23.2 / Windsurf            | 2026-08-23 | **Refactor**: Offline standalone Mermaid rendering engine; container normalization; gantt chart layout & O(1) performance closure |
 | v2.6.82       | v1.23.2 / Windsurf            | 2026-08-05 | **Fix**: Clear `product.json.checksums` for Cascade-only installs to remove Antigravity's corrupted-install warning |
 | v2.6.81       | v1.23.2 / Windsurf            | 2026-08-05 | **Security**: Moved prompt-enhance keys out of tracked source into local `.env.local`; added a committed-secret scan test |
 | v2.6.79       | v1.23.2 / Windsurf            | 2026-08-03 | **Fix**: Auto-started hidden Launchpad bridge, removed slow CORS fallback after proxy errors, forwarded request timeouts, and bounded enhancement output |

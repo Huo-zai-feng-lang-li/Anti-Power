@@ -2,7 +2,25 @@
 
 本文件记录每个版本的 Bug 修复和关键备忘, 防止后续改代码时重复踩坑. 时间格式如 `2026-05-15 09:00:00`同步的是git 提交时间
 
-## v2.6.82 (2026-08-05 21:17:15)
+## v2.6.83 (2026-08-23 16:35:00)
+
+### Mermaid 离线高精渲染与极限性能封板
+
+| 修复项 | 根因 | 影响范围 |
+|--------|------|----------|
+| **离线环境 Mermaid 渲染与流式自愈** | 纯离线环境依赖外链加载失败；流式打字输出未闭合时过早打上 skipped/error 导致死锁 | `patcher/patches/cascade-panel/mermaid.js`、`mermaid.min.js` |
+| **顶层容器归一化与父子嵌套遮蔽** | 选择器同时匹配 `div.code-block` 与 `<pre>`，导致内层生成的图表被外层 0 宽隐藏样式吞噬 | `patcher/patches/cascade-panel/mermaid.js` |
+| **甘特图拥挤与刻度重叠** | 短时间跨度下 D3 时间轴物理宽度受限；改用 `minWidth: 580px` 与 `-32°` 经典刻度倾斜排版 | `patcher/patches/cascade-panel/mermaid.js` |
+| **0 耗时伪类过滤与 O(1) 事件委托** | 普通代码块反复正则扫描与高频滚动 querySelectorAll；改用 `:not()` 伪类与根节点 capture 委托 | `scan.js`、`mermaid.js` |
+| **全屏 120 FPS 硬件加速与避让** | 全屏模态窗遮挡 Electron 顶栏原生按钮且存在滚动穿透；重构安全区与滚动锁定 | `mermaid.js`、`cascade-panel.css` |
+
+### 踩坑备忘
+
+- 扫描代码块时必须使用 `Set` 向上归一化顶层容器（`.code-block` / `pre`），严禁父子元素分别独立生成图表，否则外层隐藏样式会破坏内层 SVG 呈现。
+- 甘特图短时间跨度下的标签重叠，最佳实践是通过 SVG 文本变换矩阵注入 `translate(x,y) rotate(-32)` 倾斜排版。
+- 滚动监听统一在面板根节点采用 `capture: true` 单点委托，严禁在 MutationObserver 每次触发时使用 `querySelectorAll` 循环绑定。
+
+---
 
 ### Antigravity 损坏提示修复
 

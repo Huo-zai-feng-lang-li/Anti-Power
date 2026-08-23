@@ -142,6 +142,203 @@ const NOISE_SELECTORS = [
   ".antigravity-agent-side-panel-header",
 ];
 
+function getSafeWindows() {
+  const wins = [window];
+  try {
+    if (typeof window.parent !== "undefined" && window.parent && window.parent !== window) {
+      wins.push(window.parent);
+    }
+  } catch (e) {}
+  try {
+    if (typeof window.top !== "undefined" && window.top && window.top !== window && !wins.includes(window.top)) {
+      wins.push(window.top);
+    }
+  } catch (e) {}
+  return wins;
+}
+
+function getSafeDocuments() {
+  const docs = [document];
+  const wins = getSafeWindows();
+  for (const win of wins) {
+    try {
+      if (win.document && !docs.includes(win.document)) {
+        docs.push(win.document);
+      }
+    } catch (e) {}
+  }
+  return docs;
+}
+
+// 全局选区追踪缓存
+let lastCapturedSelection = "";
+
+// 监听全局选区与鼠标抬起（在捕获阶段捕获用户划选完毕的瞬间）
+try {
+  if (typeof window !== "undefined") {
+    const handleSelectionUpdate = () => {
+      try {
+        const sel = window.getSelection?.()?.toString() || "";
+        const clean = sel.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+        if (clean && clean.length > 0 && clean.length < SELECTION_LIMIT) {
+          lastCapturedSelection = clean;
+        }
+      } catch (e) {}
+    };
+
+    window.addEventListener("mouseup", handleSelectionUpdate, true);
+    window.addEventListener("keyup", handleSelectionUpdate, true);
+    if (typeof document !== "undefined") {
+      document.addEventListener("selectionchange", handleSelectionUpdate);
+    }
+  }
+} catch (e) {}
+
+/**
+ * 从 Monaco Editor DOM 坐标精准提取选中的代码行
+ */
+function extractFromMonacoDom(doc) {
+  try {
+    const editors = Array.from(doc.querySelectorAll(".monaco-editor")).filter((el) => {
+      return el.offsetWidth > 100 && el.offsetHeight > 100;
+    });
+
+    for (const editor of editors) {
+      const selectedBlocks = Array.from(
+        editor.querySelectorAll(".view-overlays .selected-text, .selected-text")
+      );
+      if (selectedBlocks.length === 0) continue;
+
+      // Monaco 选区块的真实行 top 坐标位于其 parentElement 上
+      const selectedTopSet = new Set();
+      selectedBlocks.forEach((b) => {
+        const parentTop = b.parentElement?.style?.top || (b.parentElement?.offsetTop ? b.parentElement.offsetTop + "px" : "");
+        const rawTop = parentTop || b.style?.top || (b.offsetTop + "px");
+        const match = /(\d+)/.exec(rawTop);
+        if (match) {
+          selectedTopSet.add(parseInt(match[1], 10));
+        }
+      });
+
+      if (selectedTopSet.size === 0) continue;
+
+      const viewLines = Array.from(editor.querySelectorAll(".view-lines .view-line"));
+      if (viewLines.length === 0) continue;
+
+      // 逐行匹配对应 top 坐标的 view-line（按 DOM 顺序排列）
+      const matchedLines = [];
+      for (const line of viewLines) {
+        const rawTop = line.style.top || (line.offsetTop + "px");
+        const match = /(\d+)/.exec(rawTop);
+        if (!match) continue;
+        const lineTop = parseInt(match[1], 10);
+
+        let isMatched = false;
+        for (const top of selectedTopSet) {
+          if (Math.abs(lineTop - top) <= 3) {
+            isMatched = true;
+            break;
+          }
+        }
+
+        if (isMatched) {
+          matchedLines.push(line.textContent || "");
+        }
+      }
+
+      if (matchedLines.length > 0) {
+        const result = matchedLines.join("\n").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+        if (result) {
+          return result;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("[PromptEnhance] Monaco 选区提取异常:", e);
+  }
+  return "";
+}
+
+/**
+ * 多源穿透获取用户在编辑器中选中的代码
+ */
+function captureActiveSelection() {
+  const wins = getSafeWindows();
+  const docs = getSafeDocuments();
+
+  // 1. 尝试通过 Monaco Editor 全局 API 读取
+  for (const win of wins) {
+    try {
+      if (win.monaco?.editor) {
+        const editors = win.monaco.editor.getEditors?.() || [];
+        for (const ed of editors) {
+          const sel = ed.getSelection?.();
+          if (sel && !sel.isEmpty?.()) {
+            const model = ed.getModel?.();
+            const text = model?.getValueInRange?.(sel);
+            const cleaned = (text || "").replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+            if (cleaned) return cleaned;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2. 尝试从 Monaco Editor DOM 坐标精准提取选中的代码行
+  for (const doc of docs) {
+    const monacoText = extractFromMonacoDom(doc);
+    if (monacoText) return monacoText;
+  }
+
+  // 3. 尝试从所有可访问的 window 实例获取原生选区
+  for (const win of wins) {
+    try {
+      const sel = win.getSelection?.()?.toString() || "";
+      const cleaned = sel.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+      if (cleaned) return cleaned;
+    } catch (e) {}
+  }
+
+  // 4. 尝试回退到全局追踪到的最新选区缓存
+  if (lastCapturedSelection) {
+    return lastCapturedSelection;
+  }
+
+  return "";
+}
+
+/**
+ * 多源穿透获取当前活跃的文件名
+ */
+function captureActiveFileName() {
+  const TAB_SELECTORS = [
+    "[class*=\"tab-\"].active",
+    ".tab.active",
+    ".tab.selected",
+    ".editor-group-container.active .tab.active",
+    "[aria-selected=\"true\"].tab",
+    ".monaco-workbench .part.editor .tab.active",
+  ];
+
+  const docs = getSafeDocuments();
+  for (const doc of docs) {
+    try {
+      for (const selector of TAB_SELECTORS) {
+        const activeTab = doc.querySelector(selector);
+        if (activeTab) {
+          const rawName = activeTab.getAttribute?.("title") ||
+                          activeTab.getAttribute?.("aria-label") ||
+                          activeTab.innerText ||
+                          activeTab.textContent || "";
+          const cleanName = rawName.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+          if (cleanName) return cleanName;
+        }
+      }
+    } catch (e) {}
+  }
+  return "";
+}
+
 /**
  * 收集对话上下文信息
  */
@@ -150,8 +347,14 @@ function buildContextPrefix() {
 
   // 1. 获取对话滚动区域
   let conversationEl = null;
-  for (const selector of CONVERSATION_SELECTORS) {
-    conversationEl = document.querySelector(selector);
+  const docs = getSafeDocuments();
+  for (const doc of docs) {
+    for (const selector of CONVERSATION_SELECTORS) {
+      try {
+        conversationEl = doc.querySelector(selector);
+        if (conversationEl) break;
+      } catch (e) {}
+    }
     if (conversationEl) break;
   }
 
@@ -167,14 +370,14 @@ function buildContextPrefix() {
     }
   }
 
-  // 2. 获取当前编辑文件名 (尝试从 Tab 获取)
-  const activeTab = document.querySelector("[class*=\"tab-\"].active, .tab.selected");
-  if (activeTab) {
-    context += `当前文件: ${activeTab.innerText.replace(/[\u200B-\u200D\uFEFF]/g, "")}\n\n`;
+  // 2. 获取当前编辑文件名 (跨 window 穿透)
+  const activeFileName = captureActiveFileName();
+  if (activeFileName) {
+    context += `当前文件: ${activeFileName}\n\n`;
   }
 
-  // 3. 获取选中的代码 (如果可能)
-  const selection = window.getSelection().toString().replace(/[\u200B-\u200D\uFEFF]/g, "");
+  // 3. 获取选中的代码 (多源穿透 + 防失焦)
+  const selection = captureActiveSelection();
   if (selection && selection.length < SELECTION_LIMIT) {
     context += `选中代码:\n${selection}\n\n`;
   }
@@ -717,6 +920,11 @@ export function createEnhanceButton(onClick) {
       <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
     </svg>
   `;
+  // 阻止 mousedown 默认夺焦行为，保持主编辑器 Monaco 选区不被清除
+  btn.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+  });
+
   btn.addEventListener("click", () => {
     if (btn.disabled) return;
 

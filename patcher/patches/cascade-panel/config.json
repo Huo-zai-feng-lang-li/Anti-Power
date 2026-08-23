@@ -1,7 +1,7 @@
 {
   "featureDefaultsVersion": 1,
-  "fontSizeEnabled": false,
-  "fontSize": 14,
+  "fontSizeEnabled": true,
+  "fontSize": 18,
   "sidePaddingLeft": 8,
   "sidePaddingRight": 3,
   "scrollToBottom": true,

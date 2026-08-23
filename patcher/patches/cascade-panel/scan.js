@@ -1,12 +1,13 @@
 /**
  * Cascade Panel 扫描模块
  *
- * 仅负责提示词增强按钮与输入框 placeholder。
- * copy、Mermaid、Math、表格修复已从主链路移除，避免非核心功能被误开启。
+ * 负责提示词增强按钮、输入框 placeholder 与 Mermaid 离线图表自动渲染。
+ * 支持虚拟列表滚动监听与防抖优化，确保零性能损耗、随滚随出图。
  */
 
 let config = {
   placeholder: "",
+  mermaid: true,
   promptEnhance: {
     enabled: false,
     apiBase: "",
@@ -32,10 +33,14 @@ const INPUT_SELECTORS = [
 const INPUT_SELECTOR = INPUT_SELECTORS.join(", ");
 const ENHANCE_BTN_CLASS = "Antigravity-Power-Pro-enhance-btn";
 let enhanceModule = null;
+let mermaidModule = null;
 let observer = null;
+let boundScrollElements = new WeakSet();
+let mermaidScanTimer = null;
 
 const getRoot = () =>
   document.querySelector(".antigravity-agent-side-panel") ||
+  document.getElementById("conversation") ||
   document.getElementById("chat") ||
   document.getElementById("react-app") ||
   document.body;
@@ -148,18 +153,59 @@ const applyPlaceholder = () => {
   });
 };
 
+// 极速防抖 Mermaid 扫描
+const triggerMermaidScan = (root = getRoot()) => {
+  if (config.mermaid === false) return;
+  if (mermaidScanTimer) clearTimeout(mermaidScanTimer);
+  mermaidScanTimer = setTimeout(async () => {
+    if (!mermaidModule) {
+      try {
+        mermaidModule = await import(`./mermaid.js?t=${Date.now()}`);
+      } catch (e) {
+        console.warn("[Cascade] 无法加载 Mermaid 模块:", e);
+        return;
+      }
+    }
+    mermaidModule.scanAndRenderMermaid(root);
+  }, 20);
+};
+
+// 全局单点捕获委托滚动监听 (O(1) 零开销，无需每次 DOM 变动遍历元素)
+let scrollListenerBound = false;
+const bindGlobalScrollListener = (root = getRoot()) => {
+  if (scrollListenerBound || !root) return;
+  scrollListenerBound = true;
+  root.addEventListener(
+    "scroll",
+    () => {
+      triggerMermaidScan(root);
+    },
+    { capture: true, passive: true },
+  );
+};
+
+let globalScanTimer = null;
+
 const init = () => {
   const root = getRoot();
   applyPlaceholder();
   void initPromptEnhanceButton(root);
+  triggerMermaidScan(root);
+  bindGlobalScrollListener(root);
 
   if (observer) observer.disconnect();
   observer = new MutationObserver(() => {
-    applyPlaceholder();
-    void initPromptEnhanceButton(getRoot());
+    if (globalScanTimer) clearTimeout(globalScanTimer);
+    globalScanTimer = setTimeout(() => {
+      applyPlaceholder();
+      const currentRoot = getRoot();
+      void initPromptEnhanceButton(currentRoot);
+      triggerMermaidScan(currentRoot);
+      bindGlobalScrollListener(currentRoot);
+    }, 20);
   });
 
-  observer.observe(root, {
+  observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
@@ -174,7 +220,15 @@ export const start = (userConfig = {}) => {
       ...(userConfig.promptEnhance || {}),
     },
   };
-  console.log("[Cascade] 启动提示词扫描，配置:", config.promptEnhance);
+  console.log("[Cascade] 启动面板扫描，配置:", config);
+
+  // 预热预加载 Mermaid 引擎，避免首次渲染延迟
+  if (config.mermaid !== false) {
+    import(`./mermaid.js?t=${Date.now()}`).then((mod) => {
+      mermaidModule = mod;
+      console.log("[Cascade] Mermaid 渲染引擎预热完成.");
+    }).catch(() => {});
+  }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init, { once: true });

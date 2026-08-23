@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro/releases">
-    <img src="https://img.shields.io/badge/version-v2.6.82-gold?style=flat-square" alt="版本">
+    <img src="https://img.shields.io/badge/version-v2.6.83-gold?style=flat-square" alt="版本">
 
   </a>
   <a href="https://codeium.com/antigravity">
@@ -93,6 +93,7 @@
 
 | 补丁版本    | 支持 IDE 版本      | 发布日期   | 重大更新内容                                                                                         |
 | :---------- | :----------------- | :--------- | :--------------------------------------------------------------------------------------------------- |
+| **v2.6.83** | v1.23.2 / Windsurf | 2026-08-23 | **重构**: 离线集成高精 Mermaid 渲染引擎；顶层容器归一化与流式自愈；甘特图倾斜排版与 O(1) 性能封板 | ✅ 推荐 |
 | **v2.6.82** | v1.23.2 / Windsurf | 2026-08-05 | **修复**: 只启用 Cascade 时统一清空 `product.json.checksums`，消除 Antigravity “安装似乎损坏”提示 | ✅ 推荐 |
 | **v2.6.81** | v1.23.2 / Windsurf | 2026-08-05 | **安全**: 提示词增强 Key 从开源 tracked 文件隔离到本地 `.env.local`；新增提交前 Secret 扫描测试 | ✅ 推荐 |
 | **v2.6.80** | v1.23.2 / Windsurf | 2026-08-05 | **修复**: 多行提示词 DOM 替换保持段落与缩进格式；规范文本不可见字符与换行符；优化上下文提取与 Token 限制 | ✅ 推荐 |

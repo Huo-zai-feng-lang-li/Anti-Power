@@ -47,6 +47,8 @@ pub struct FeatureConfig {
     pub enabled: bool,
     #[serde(rename = "scrollToBottom")]
     pub scroll_to_bottom: bool,
+    #[serde(rename = "mermaid")]
+    pub mermaid: bool,
     #[serde(rename = "fontSizeEnabled")]
     pub font_size_enabled: bool,
     #[serde(rename = "fontSize")]
@@ -66,8 +68,9 @@ impl Default for FeatureConfig {
             feature_defaults_version: FEATURE_DEFAULTS_VERSION,
             enabled: true,
             scroll_to_bottom: true,
-            font_size_enabled: false,
-            font_size: 14.0,
+            mermaid: true,
+            font_size_enabled: true,
+            font_size: 18.0,
             side_padding_left: 8.0,
             side_padding_right: 3.0,
             prompt_enhance: PromptEnhanceConfig::default(),
@@ -98,7 +101,7 @@ impl Default for ManagerFeatureConfig {
     fn default() -> Self {
         Self {
             feature_defaults_version: FEATURE_DEFAULTS_VERSION,
-            enabled: true,
+            enabled: false,
             scroll_to_bottom: true,
             font_size_enabled: false,
             font_size: 16.0,
@@ -637,6 +640,7 @@ fn write_config_file(config_path: &PathBuf, features: &FeatureConfig) -> Result<
     let config_content = serde_json::json!({
         "featureDefaultsVersion": FEATURE_DEFAULTS_VERSION,
         "scrollToBottom": features.scroll_to_bottom,
+        "mermaid": features.mermaid,
         "fontSizeEnabled": features.font_size_enabled,
         "fontSize": features.font_size,
         "sidePaddingLeft": clamp_side_padding(features.side_padding_left),

@@ -22,6 +22,7 @@ const DEFAULT_CONFIG = {
   sidePaddingLeft: 8,
   sidePaddingRight: 3,
   scrollToBottom: true,
+  mermaid: true,
   placeholder: "Ask Antigravity...",
   promptEnhance: {
     enabled: true,
@@ -88,7 +89,7 @@ const applySidePadding = (userConfig) => {
   applyFontSize(config);
   applySidePadding(config);
 
-  const { start } = await import("./scan.js");
+  const { start } = await import(`./scan.js?t=${Date.now()}`);
   start(config);
 
   if (config.scrollToBottom !== false) {

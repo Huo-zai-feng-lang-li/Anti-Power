@@ -13,7 +13,7 @@ import ManagerFeatureCard from "./components/ManagerFeatureCard.vue";
 import { getVersion } from "@tauri-apps/api/app";
 
 // 常量
-const APP_VERSION = ref("2.6.82");
+const APP_VERSION = ref("2.6.83");
 const GITHUB_URL = "https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro";
 // 每次更新 DEFAULT_SYSTEM_PROMPT 时递增此版本号，旧版 config 会自动重置
 const SYSTEM_PROMPT_VERSION = 2;
@@ -81,8 +81,9 @@ const features = ref({
   enabled: true,
   featureDefaultsVersion: FEATURE_DEFAULTS_VERSION,
   scrollToBottom: true,
-  fontSizeEnabled: false,
-  fontSize: 14,
+  mermaid: true,
+  fontSizeEnabled: true,
+  fontSize: 18,
   sidePaddingLeft: 8,
   sidePaddingRight: 3,
   promptEnhance: {
@@ -128,7 +129,7 @@ const WINDSURF_PATCH_FILES = {
 
 // Manager 功能开关 (归一化至尊版)
 const managerFeatures = ref({
-  enabled: true,
+  enabled: false,
   featureDefaultsVersion: FEATURE_DEFAULTS_VERSION,
   scrollToBottom: true,
   fontSizeEnabled: false,
@@ -153,7 +154,6 @@ type FeatureDefaultsConfig = {
   featureDefaultsVersion?: number;
   fontSizeEnabled?: boolean;
 };
-type DefaultOffFeatureKey = Exclude<keyof FeatureDefaultsConfig, "featureDefaultsVersion">;
 type PromptEnhanceDiskConfig = Partial<{
   enabled: boolean;
   provider: string;
@@ -165,6 +165,7 @@ type PromptEnhanceDiskConfig = Partial<{
 }>;
 type FeatureBaseConfig = FeatureDefaultsConfig & {
   scrollToBottom?: boolean;
+  mermaid?: boolean;
   fontSize?: number;
   promptEnhance?: PromptEnhanceDiskConfig;
 };
@@ -174,21 +175,9 @@ type CascadePatchConfig = FeatureBaseConfig & {
   sidePaddingRight?: number;
 };
 
-const FONT_DEFAULT_OFF_KEYS: readonly DefaultOffFeatureKey[] = ["fontSizeEnabled"];
-
 function normalizeDefaultOffFeatures<T extends FeatureDefaultsConfig>(
   merged: T,
-  disk: FeatureDefaultsConfig,
-  keys: readonly DefaultOffFeatureKey[],
 ): T {
-  const diskVersion = Number(disk.featureDefaultsVersion) || 0;
-  if (diskVersion < FEATURE_DEFAULTS_VERSION) {
-    keys.forEach((key) => {
-      if (key in merged) {
-        merged[key] = false;
-      }
-    });
-  }
   merged.featureDefaultsVersion = FEATURE_DEFAULTS_VERSION;
   return merged;
 }
@@ -248,11 +237,7 @@ async function checkWindsurfPatchStatus(path: string) {
     if (isWindsurfInstalled.value) {
       const config = await invoke<any>("read_windsurf_patch_config", { path });
       if (config) {
-        const merged = normalizeDefaultOffFeatures(
-          { ...windsurfFeatures.value, ...config },
-          config,
-          FONT_DEFAULT_OFF_KEYS,
-        );
+        const merged = normalizeDefaultOffFeatures({ ...windsurfFeatures.value, ...config });
         if (config.promptEnhance) {
           merged.promptEnhance = mergePromptEnhance(
             windsurfFeatures.value.promptEnhance,
@@ -359,11 +344,11 @@ async function checkPatchStatus(path: string) {
       // 读取侧边栏配置
       const config = await invoke<CascadePatchConfig | null>("read_patch_config", { path });
       if (config) {
-        const merged = normalizeDefaultOffFeatures(
-          { ...features.value, ...config, promptEnhance: features.value.promptEnhance },
-          config,
-          FONT_DEFAULT_OFF_KEYS,
-        );
+        const merged = normalizeDefaultOffFeatures({
+          ...features.value,
+          ...config,
+          promptEnhance: features.value.promptEnhance,
+        });
         if (config.promptEnhance) {
           merged.promptEnhance = mergePromptEnhance(
             features.value.promptEnhance,
@@ -379,8 +364,7 @@ async function checkPatchStatus(path: string) {
         const mergedManager = normalizeDefaultOffFeatures({
           ...managerFeatures.value,
           ...mConfig,
-          enabled: true 
-        }, mConfig, FONT_DEFAULT_OFF_KEYS);
+        });
         if (mConfig.promptEnhance) {
           mergedManager.promptEnhance = mergePromptEnhance(
             managerFeatures.value.promptEnhance,
