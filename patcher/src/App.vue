@@ -13,7 +13,7 @@ import ManagerFeatureCard from "./components/ManagerFeatureCard.vue";
 import { getVersion } from "@tauri-apps/api/app";
 
 // 常量
-const APP_VERSION = ref("2.6.83");
+const APP_VERSION = ref("2.6.86");
 const GITHUB_URL = "https://github.com/Huo-zai-feng-lang-li/Antigravity-Power-Pro";
 // 每次更新 DEFAULT_SYSTEM_PROMPT 时递增此版本号，旧版 config 会自动重置
 const SYSTEM_PROMPT_VERSION = 2;

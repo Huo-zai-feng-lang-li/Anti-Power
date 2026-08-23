@@ -250,7 +250,38 @@ export const ensureMermaid = async () => {
 };
 
 /**
- * 智能精确提取 Mermaid 源码（自动剔除外部干扰文字与围栏）
+ * 健壮的 Mermaid 语法自动容错与清洗（自动修复 LLM 生成的常见语法瑕疵）
+ * @param {string} text
+ * @returns {string}
+ */
+export const sanitizeMermaidSyntax = (text) => {
+  if (!text) return "";
+  let lines = text.split("\n");
+  let isGantt = false;
+
+  const cleaned = lines.map((line) => {
+    const trimmed = line.trim();
+    if (/^gantt\b/i.test(trimmed)) {
+      isGantt = true;
+      return line;
+    }
+
+    // 甘特图容错：修复类似 "任务名   :   des1, 2026-08-23" 冒号后纯空格无标签导致的词法解析错误
+    if (isGantt && line.includes(":")) {
+      line = line.replace(/:\s{2,}([a-zA-Z0-9_]+)/g, ": $1");
+    }
+
+    // 针对 Markdown 解析遗留的 <br/> <br> 自动转换为纯换行或空格，防止破坏 SVG DOM
+    line = line.replace(/<br\s*\/?>/gi, " ");
+
+    return line;
+  });
+
+  return cleaned.join("\n");
+};
+
+/**
+ * 智能精确提取 Mermaid 源码（自动剔除外部干扰文字与围栏，并进行语法自愈）
  * @param {Element} el
  * @returns {string}
  */
@@ -284,10 +315,10 @@ export const extractMermaidSource = (el) => {
     /\b(graph|flowchart|sequenceDiagram|classDiagram|classDiagram-v2|stateDiagram|stateDiagram-v2|erDiagram|gantt|pie|journey|gitGraph|mindmap|timeline|quadrantChart|xychart|sankey|block|packet|architecture)\b[\s\S]*/i
   );
   if (match) {
-    return match[0].trim();
+    return sanitizeMermaidSyntax(match[0].trim());
   }
 
-  return raw;
+  return sanitizeMermaidSyntax(raw);
 };
 
 /**

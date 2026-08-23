@@ -153,7 +153,7 @@ const applyPlaceholder = () => {
   });
 };
 
-// 极速防抖 Mermaid 扫描
+// 极速防抖 Mermaid 扫描 (提高至 120ms 防抖，彻底消除滚动时持续主线程争抢)
 const triggerMermaidScan = (root = getRoot()) => {
   if (config.mermaid === false) return;
   if (mermaidScanTimer) clearTimeout(mermaidScanTimer);
@@ -167,10 +167,10 @@ const triggerMermaidScan = (root = getRoot()) => {
       }
     }
     mermaidModule.scanAndRenderMermaid(root);
-  }, 20);
+  }, 120);
 };
 
-// 全局单点捕获委托滚动监听 (O(1) 零开销，无需每次 DOM 变动遍历元素)
+// 全局单点捕获委托滚动监听 (Passive + 120ms 节流防抖，零滚动手感阻碍)
 let scrollListenerBound = false;
 const bindGlobalScrollListener = (root = getRoot()) => {
   if (scrollListenerBound || !root) return;
@@ -202,7 +202,7 @@ const init = () => {
       void initPromptEnhanceButton(currentRoot);
       triggerMermaidScan(currentRoot);
       bindGlobalScrollListener(currentRoot);
-    }, 20);
+    }, 100);
   });
 
   observer.observe(document.body, {
